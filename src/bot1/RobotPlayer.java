@@ -7,6 +7,8 @@ import battlecode.common.*;
  * RobotPlayer is the class that describes your main robot strategy.
  * The run() method inside this class is like your main function: this is what we'll call once your robot
  * is created!
+ *
+ * This class is inherited by Unit class
  */
 public strictfp class RobotPlayer {
     static RobotController rc;
@@ -31,19 +33,23 @@ public strictfp class RobotPlayer {
 
         rc.setIndicatorString("Hello world!");
 
-        while (true) {
-            // This code runs during the entire lifespan of the robot, which is why it is in an infinite
-            // loop. If we ever leave this loop and return from run(), the robot dies! At the end of the
-            // loop, we call Clock.yield(), signifying that we've done everything we want to do.
 
-            turnCount += 1;  // We have now been alive for one more turn!
+        while (true) {
 
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode.
             try {
-                // The same run() function is called for every robot on your team, even if they are
-                // different types. Here, we separate the control depending on the RobotType, so we can
-                // use different strategies on different robots. If you wish, you are free to rewrite
-                // this into a different control structure!
+                Comm.turn_starts();
+                if (turnCount == 0) {
+                    switch (rc.getType()) {
+                        case HEADQUARTERS: Headquarter.setup();  break;
+                        case CARRIER:
+                        case LAUNCHER:
+                        case BOOSTER: // Examplefuncsplayer doesn't use any of these robot types below.
+                        case DESTABILIZER: // You might want to give them a try!
+                        case AMPLIFIER:       break;
+                    }
+                }
+
                 switch (rc.getType()) {
                     case HEADQUARTERS: Headquarter.run();  break;
                     case CARRIER: Carrier.run();  break;
@@ -52,7 +58,7 @@ public strictfp class RobotPlayer {
                     case DESTABILIZER: // You might want to give them a try!
                     case AMPLIFIER:       break;
                 }
-
+                Comm.turn_ends();
             } catch (GameActionException e) {
                 // Oh no! It looks like we did something illegal in the Battlecode world. You should
                 // handle GameActionExceptions judiciously, in case unexpected events occur in the game
@@ -71,7 +77,7 @@ public strictfp class RobotPlayer {
                 // This will make our code wait until the next turn, and then perform this loop again.
                 Clock.yield();
             }
-            // End of loop: go back to the top. Clock.yield() has ended, so it's time for another turn!
+            turnCount += 1;
         }
 
         // Your code should never reach here (unless it's intentional)! Self-destruction imminent...

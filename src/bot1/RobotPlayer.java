@@ -39,17 +39,6 @@ public strictfp class RobotPlayer {
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode.
             try {
                 Comm.turn_starts();
-                if (turnCount == 0) {
-                    switch (rc.getType()) {
-                        case HEADQUARTERS: Headquarter.setup();  break;
-                        case CARRIER:
-                        case LAUNCHER:
-                        case BOOSTER: // Examplefuncsplayer doesn't use any of these robot types below.
-                        case DESTABILIZER: // You might want to give them a try!
-                        case AMPLIFIER:       break;
-                    }
-                }
-
                 switch (rc.getType()) {
                     case HEADQUARTERS: Headquarter.run();  break;
                     case CARRIER: Carrier.run();  break;

@@ -13,19 +13,31 @@ import battlecode.common.*;
  * each type of length 14
  * 2 bits: closest HQ ID
  * 12 bits: well location
+ *
+ * spawn queue starting at bit 138
+ * length: 10
+ * each of 16 bits
+ * 12 bit: coord (63, 63 as empty)
+ * 4 bit flag
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64;
+    private static final int WELL_INFO_BIT = 96;
+    private static final int SPAWN_Q_BIT = 138;
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
 
     public static int numHQ = 0;
     public static MapLocation[] friendlyHQLocations = new MapLocation[4];
+
     public static int[] closestHQIDToWells = new int[4];
     public static MapLocation[] closestWells = new MapLocation[4];
 
+    public static final int SPAWN_Q_LENGTH = 10;
+
     public static void turn_starts() throws GameActionException {
+        // TODO only update constant like variable (eg no spawn Q)
         boolean changed = false;
         for (int i = 0; i < ARRAY_LENGTH; i++) {
             if (rc.readSharedArray(i) != buffered_share_array[i]) {
@@ -58,6 +70,10 @@ public class Comm extends RobotPlayer {
         writeBits(WELL_INFO_BIT + 2, 12, 4095);
         writeBits(WELL_INFO_BIT + 16, 12, 4095);
         writeBits(WELL_INFO_BIT + 30, 12, 4095);
+        // spawn Q
+        for (int i = 0; i < SPAWN_Q_LENGTH; i++) {
+            writeBits(SPAWN_Q_BIT + 16 * i, 12, 4095);
+        }
     }
 
     // HQ locations starting at bit 0
@@ -92,7 +108,6 @@ public class Comm extends RobotPlayer {
     }
 
     // well infos starting
-    private static final int WELL_INFO_BIT = 96;
 
     public static void updateWells() {
         for (int resourceID = 1; resourceID <= 3; resourceID++) {
@@ -133,6 +148,28 @@ public class Comm extends RobotPlayer {
             writeBits(startingBit + 8, 6, wellLocation.y);
             updateWells();
         }
+    }
+
+    // spawn Q starts
+    public static MapLocation getSpawnQLoc(int index) {
+        assert index < SPAWN_Q_LENGTH;
+        int x = readBits(SPAWN_Q_BIT + 16 * index, 6);
+        int y = readBits(SPAWN_Q_BIT + 16 * index + 6, 6);
+        if (x == 63 && y == 63)
+            return null;
+        return new MapLocation(x, y);
+    }
+
+    public static int getSpawnQFlag(int index) {
+        assert index < SPAWN_Q_LENGTH;
+        return readBits(SPAWN_Q_BIT + 16 * index + 12, 4);
+    }
+
+    public static void setSpawnQ(int index, int x, int y, int flag) {
+        assert index < SPAWN_Q_LENGTH;
+        writeBits(SPAWN_Q_BIT + index * 16, 6, x);
+        writeBits(SPAWN_Q_BIT + index * 16 + 6, 6, y);
+        writeBits(SPAWN_Q_BIT + index * 16 + 12, 4, flag);
     }
 
     // helper funcs

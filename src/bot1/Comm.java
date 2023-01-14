@@ -40,6 +40,7 @@ public class Comm extends RobotPlayer {
 
     public static int numHQ = 0;
     public static MapLocation[] friendlyHQLocations = {null, null, null, null};
+    public static MapLocation[] enemyHQLocations = {null, null, null, null};
 
     public static int[] closestHQIDToWells = new int[4];
     public static MapLocation[] closestWells = {null, null, null, null};
@@ -97,6 +98,8 @@ public class Comm extends RobotPlayer {
                 friendlyHQLocations[i] = null;
             } else {
                 friendlyHQLocations[i] = new MapLocation(x - 1, y - 1);
+                // assume the map is rotationally symmetric, FIXME
+                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - x, rc.getMapHeight() - y);
                 numHQ++;
             }
         }

@@ -116,6 +116,7 @@ public class Comm extends RobotPlayer {
                 closestWells[resourceID] = new MapLocation(x - 1, y - 1);
             }
         }
+        needWellsUpdate = false;
     }
 
     public static void reportWells(WellInfo well) {

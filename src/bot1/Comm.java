@@ -4,21 +4,29 @@ import battlecode.common.*;
 
 /***
  *
+ * to represent coord, the value in the shared array is 1 more than usual
+ * so that (0,0) in shared array means null
+ *
  * Shared array
- * coord pos of 63 means unset (0 is used and max pos is 59)
  * 0-47: 4*2 6bits int specifying the coord of friendly HQs
- * 48-95: 4*2 6bits int specifying the coord of enemy HQs
+ * 48-49: 2 bit indicating symmetry of map (0 unknown, 1 rotational, 2 vertial, 3 horizontal)
  *
  * wells info starting bit 96 of 3 types
- * each type of length 14
+ * each type of length 14 for a total of 42 bits (96-138)
  * 2 bits: closest HQ ID
  * 12 bits: well location
  *
  * spawn queue starting at bit 138
  * length: 10
- * each of 16 bits
- * 12 bit: coord (63, 63 as empty)
+ * each of 16 bits, total of 160 bits
+ * 12 bit: coord
  * 4 bit flag
+ *
+ * Launcher cmd 20bits
+ * go where to fight
+ *
+ * 35 islands
+ * each 12(6) bits for pos, 4 flags for if conquered
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64;
@@ -27,6 +35,8 @@ public class Comm extends RobotPlayer {
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
+
+    private static boolean needWellsUpdate = false;
 
     public static int numHQ = 0;
     public static MapLocation[] friendlyHQLocations = new MapLocation[4];
@@ -38,15 +48,21 @@ public class Comm extends RobotPlayer {
 
     public static void turn_starts() throws GameActionException {
         // TODO only update constant like variable (eg no spawn Q)
-        boolean changed = false;
         for (int i = 0; i < ARRAY_LENGTH; i++) {
             if (rc.readSharedArray(i) != buffered_share_array[i]) {
-                changed = true;
+                if (i >= 5 && i <= 8) {
+                    needWellsUpdate = true;
+                }
                 buffered_share_array[i] = rc.readSharedArray(i);
             }
         }
-        if (changed) {
-            updateFriendlyHQLocations();
+        // HQ update should only be done once, at turn 1 for all HQ, and at turn 0 for other units
+        if ((turnCount == 1 && rc.getType() == RobotType.HEADQUARTERS)
+                || (turnCount == 0 && rc.getType() != RobotType.HEADQUARTERS)) {
+            updateHQLocations();
+        }
+
+        if (needWellsUpdate) {
             updateWells();
         }
     }
@@ -61,21 +77,6 @@ public class Comm extends RobotPlayer {
         }
     }
 
-    public static void global_init() {
-        // HQ
-        for (int i = 0; i < 4; i++) {
-            writeBits(i * 12, 12, 4095);
-        }
-        // wells
-        writeBits(WELL_INFO_BIT + 2, 12, 4095);
-        writeBits(WELL_INFO_BIT + 16, 12, 4095);
-        writeBits(WELL_INFO_BIT + 30, 12, 4095);
-        // spawn Q
-        for (int i = 0; i < SPAWN_Q_LENGTH; i++) {
-            writeBits(SPAWN_Q_BIT + 16 * i, 12, 4095);
-        }
-    }
-
     // HQ locations starting at bit 0
 
     // this should be called by the setup of each HQ
@@ -83,25 +84,19 @@ public class Comm extends RobotPlayer {
         // I am assuming HQIDs are < 8, one team using 0/2/4/6 and the other using 1/3/5/7
         assert(HQID < 8);
         HQID /= 2;
-        updateFriendlyHQLocations();
-        if (friendlyHQLocations[HQID] != null) {
-            // this means that shared array hasn't been inited, so we perform init
-            global_init();
-        }
-        writeBits(HQID * 12, 6, location.x);
-        writeBits(HQID * 12 + 6, 6, location.y);
-        updateFriendlyHQLocations();
+        writeBits(HQID * 12, 6, location.x + 1);
+        writeBits(HQID * 12 + 6, 6, location.y + 1);
     }
 
-    private static void updateFriendlyHQLocations() {
+    private static void updateHQLocations() {
         numHQ = 0;
         for (int i = 0; i < 4; i++) {
             int x = readBits(12 * i, 6);
             int y = readBits(12 * i + 6, 6);
-            if (x == 63 && y == 63) {
+            if (x == 0 && y == 0) {
                 friendlyHQLocations[i] = null;
             } else {
-                friendlyHQLocations[i] = new MapLocation(x, y);
+                friendlyHQLocations[i] = new MapLocation(x - 1, y - 1);
                 numHQ++;
             }
         }
@@ -115,10 +110,10 @@ public class Comm extends RobotPlayer {
             closestHQIDToWells[resourceID] = readBits(startingBit, 2);
             int x = readBits(startingBit + 2, 6);
             int y = readBits(startingBit + 8, 6);
-            if (x == 63 && y == 63) {
+            if (x == 0 && y == 0) {
                 closestWells[resourceID] = null;
             } else {
-                closestWells[resourceID] = new MapLocation(x, y);
+                closestWells[resourceID] = new MapLocation(x - 1, y - 1);
             }
         }
     }
@@ -128,10 +123,15 @@ public class Comm extends RobotPlayer {
         ResourceType resourceType = well.getResourceType();
 
         int closestHQID = 0, minDis = Integer.MAX_VALUE;
-        for (int i = 0; i < 4; i++) {
-            if (friendlyHQLocations[i] != null && wellLocation.distanceSquaredTo(friendlyHQLocations[i]) < minDis) {
-                minDis = wellLocation.distanceSquaredTo(friendlyHQLocations[i]);
-                closestHQID = i;
+        if (rc.getType() == RobotType.HEADQUARTERS) {
+            closestHQID = rc.getID() / 2;
+            minDis = rc.getLocation().distanceSquaredTo(wellLocation);
+        } else {
+            for (int i = 0; i < 4; i++) {
+                if (friendlyHQLocations[i] != null && wellLocation.distanceSquaredTo(friendlyHQLocations[i]) < minDis) {
+                    minDis = wellLocation.distanceSquaredTo(friendlyHQLocations[i]);
+                    closestHQID = i;
+                }
             }
         }
         assert minDis != Integer.MAX_VALUE;
@@ -144,9 +144,9 @@ public class Comm extends RobotPlayer {
             // update shared array
             int startingBit = WELL_INFO_BIT + (resourceType.resourceID - 1) * 14;
             writeBits(startingBit, 2, closestHQID);
-            writeBits(startingBit + 2, 6, wellLocation.x);
-            writeBits(startingBit + 8, 6, wellLocation.y);
-            updateWells();
+            writeBits(startingBit + 2, 6, wellLocation.x + 1);
+            writeBits(startingBit + 8, 6, wellLocation.y + 1);
+            needWellsUpdate = true;
         }
     }
 
@@ -155,9 +155,9 @@ public class Comm extends RobotPlayer {
         assert index < SPAWN_Q_LENGTH;
         int x = readBits(SPAWN_Q_BIT + 16 * index, 6);
         int y = readBits(SPAWN_Q_BIT + 16 * index + 6, 6);
-        if (x == 63 && y == 63)
+        if (x == 0 && y == 0)
             return null;
-        return new MapLocation(x, y);
+        return new MapLocation(x - 1, y - 1);
     }
 
     public static int getSpawnQFlag(int index) {
@@ -165,10 +165,11 @@ public class Comm extends RobotPlayer {
         return readBits(SPAWN_Q_BIT + 16 * index + 12, 4);
     }
 
+    // to reset a spawn Q position, set (index, -1, -1, 0)
     public static void setSpawnQ(int index, int x, int y, int flag) {
         assert index < SPAWN_Q_LENGTH;
-        writeBits(SPAWN_Q_BIT + index * 16, 6, x);
-        writeBits(SPAWN_Q_BIT + index * 16 + 6, 6, y);
+        writeBits(SPAWN_Q_BIT + index * 16, 6, x + 1);
+        writeBits(SPAWN_Q_BIT + index * 16 + 6, 6, y + 1);
         writeBits(SPAWN_Q_BIT + index * 16 + 12, 4, flag);
     }
 
@@ -183,6 +184,7 @@ public class Comm extends RobotPlayer {
         return rv;
     }
 
+    // TODO this needs optimization
     private static void writeBits(int startingBitIndex, int length, int value) {
         assert value < (1 << length);
         for (int i = startingBitIndex; i < startingBitIndex + length; i++) {

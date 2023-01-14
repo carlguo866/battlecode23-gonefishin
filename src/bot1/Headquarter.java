@@ -11,14 +11,15 @@ public class Headquarter extends Unit {
             for (WellInfo well : rc.senseNearbyWells()) {
                 Comm.reportWells(well);
             }
-        } else if (turnCount == 1) {
+        } else if (turnCount >= 1) {
             assert Comm.closestWells[ResourceType.MANA.resourceID] != null;
             if (rc.getID() / 2 == Comm.closestHQIDToWells[ResourceType.MANA.resourceID]) {
                 Direction direction = rc.getLocation().directionTo(Comm.closestWells[ResourceType.MANA.resourceID]);
                 MapLocation location = rc.getLocation().add(direction);
-                assert rc.canBuildRobot(RobotType.CARRIER, location);
-                rc.buildRobot(RobotType.CARRIER, location);
-                Comm.setSpawnQ(0, location.x, location.y, Carrier.MINE_MN);
+                if(rc.canBuildRobot(RobotType.CARRIER, location)) {
+                    rc.buildRobot(RobotType.CARRIER, location);
+                    Comm.setSpawnQ(0, location.x, location.y, Carrier.MINE_MN);
+                }
             }
         }
     }

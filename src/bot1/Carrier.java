@@ -30,7 +30,7 @@ public class Carrier extends Unit {
                 MapLocation location = Comm.getSpawnQLoc(i);
                 if (location != null && location.compareTo(rc.getLocation()) == 0) {
                     purpose = Comm.getSpawnQFlag(i);
-                    Comm.setSpawnQ(i, 63, 63, 0);
+                    Comm.setSpawnQ(i, -1, -1, 0);
                 }
             }
             assert purpose == MINE_MN || purpose == SCOUT; // others not implemented yet

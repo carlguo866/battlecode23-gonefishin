@@ -15,9 +15,11 @@ public class Unit extends RobotPlayer {
             if (rc.canMove(dir))
                 rc.move(dir);
             else {
-                dir = directions[rng.nextInt(directions.length)];
-                if (rc.canMove(dir))
-                    rc.move(dir);
+                int starting_i = rng.nextInt(directions.length);
+                for (int i = starting_i; i < starting_i + 8; i++) {
+                    dir = directions[i % 8];
+                    if (rc.canMove(dir)) rc.move(dir);
+                }
             }
         }
     }

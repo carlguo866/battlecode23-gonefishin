@@ -53,6 +53,21 @@ public class Carrier extends Unit {
             if (rc.canCollectResource(miningWellLoc, -1)) {
                 rc.collectResource(miningWellLoc, -1);
                 indicator += "collecting,";
+                // moving pattern to allow others to join
+                Direction dir = rc.getLocation().directionTo(miningWellLoc);
+                // if can move on to the mine, do it
+                if (dir != Direction.CENTER) {
+                    if (rc.canMove(dir)) {
+                        rc.move(dir);
+                    } else { // or try to move in a circle
+                        if (dir == Direction.NORTHEAST || dir == Direction.NORTHWEST || dir == Direction.SOUTHEAST || dir == Direction.SOUTHWEST) {
+                            dir = dir.rotateRight();
+                        } else {
+                            dir = dir.rotateRight().rotateRight();
+                        }
+                        if (rc.canMove(dir)) rc.move(dir);
+                    }
+                }
             } else if (rc.getResourceAmount(resourceType) >= MAX_WEIGHT) {
                 state = DROPPING_RESOURCE;
             } else {

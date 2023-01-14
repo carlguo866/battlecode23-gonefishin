@@ -35,9 +35,9 @@ public class Carrier extends Unit {
                 }
             }
             if (purpose != MINE_MN && purpose != SCOUT) {
-                System.out.println(rc.getLocation());
+                purpose = MINE_MN;
             }
-            assert purpose == MINE_MN || purpose == SCOUT; // others not implemented yet
+//            assert purpose == MINE_MN || purpose == SCOUT; // others not implemented yet
             if (purpose == MINE_MN) {
                 state = MINING;
                 resourceType = ResourceType.values()[purpose];

@@ -31,7 +31,7 @@ import battlecode.common.*;
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64;
     private static final int WELL_INFO_BIT = 96;
-    private static final int SPAWN_Q_BIT = 138;
+    private static final int SPAWN_Q_BIT = 160;
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -45,7 +45,7 @@ public class Comm extends RobotPlayer {
     public static int[] closestHQIDToWells = new int[4];
     public static MapLocation[] closestWells = {null, null, null, null};
 
-    public static final int SPAWN_Q_LENGTH = 10;
+    public static final int SPAWN_Q_LENGTH = 4;
 
     public static void turn_starts() throws GameActionException {
         // TODO only update constant like variable (eg no spawn Q)

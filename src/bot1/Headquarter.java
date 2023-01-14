@@ -20,7 +20,7 @@ public class Headquarter extends Unit {
                 MapLocation location = new MapLocation(spawnLocation.x + dir[0], spawnLocation.y + dir[1]);
                 if(rc.canBuildRobot(RobotType.LAUNCHER, location)) {
                     rc.buildRobot(RobotType.LAUNCHER, location);
-                    Comm.setSpawnQ(rc.getID() + 1, location.x, location.y, Carrier.MINE_MN);
+                    Comm.setSpawnQ(rc.getID() / 2, location.x, location.y, Carrier.MINE_MN);
                     break;
                 }
             }
@@ -31,7 +31,7 @@ public class Headquarter extends Unit {
             MapLocation location = rc.getLocation().add(direction);
             if(rc.canBuildRobot(RobotType.CARRIER, location)) {
                 rc.buildRobot(RobotType.CARRIER, location);
-                Comm.setSpawnQ(rc.getID(), location.x, location.y, Carrier.MINE_MN);
+                Comm.setSpawnQ(rc.getID() / 2, location.x, location.y, Carrier.MINE_MN);
             }
         }
     }

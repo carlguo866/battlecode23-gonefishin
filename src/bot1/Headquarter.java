@@ -12,16 +12,16 @@ public class Headquarter extends Unit {
                 Comm.reportWells(well);
             }
         } else if (turnCount >= 1) {
-            assert Comm.closestWells[ResourceType.MANA.resourceID] != null;
-            Direction direction = rc.getLocation().directionTo(Comm.closestWells[ResourceType.MANA.resourceID]);
-            MapLocation location = rc.getLocation().add(direction);
-            if(rc.canBuildRobot(RobotType.CARRIER, location)) {
-                rc.buildRobot(RobotType.CARRIER, location);
-                Comm.setSpawnQ(rc.getID(), location.x, location.y, Carrier.MINE_MN);
+            if (Comm.closestWells[ResourceType.MANA.resourceID] != null) {
+                Direction direction = rc.getLocation().directionTo(Comm.closestWells[ResourceType.MANA.resourceID]);
+                MapLocation location = rc.getLocation().add(direction);
+                if(rc.canBuildRobot(RobotType.CARRIER, location)) {
+                    rc.buildRobot(RobotType.CARRIER, location);
+                    Comm.setSpawnQ(rc.getID(), location.x, location.y, Carrier.MINE_MN);
+                }
             }
 
-            // launcher built on opposite side, fix later
-            location = rc.getLocation().add(direction.opposite());
+            MapLocation location = rc.getLocation().add(directions[rng.nextInt(8)]);
             if(rc.canBuildRobot(RobotType.LAUNCHER, location)) {
                 rc.buildRobot(RobotType.LAUNCHER, location);
                 Comm.setSpawnQ(rc.getID() + 1, location.x, location.y, Carrier.MINE_MN);

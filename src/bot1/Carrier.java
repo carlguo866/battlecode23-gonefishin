@@ -34,6 +34,9 @@ public class Carrier extends Unit {
                     Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
                 }
             }
+            if (purpose != MINE_MN && purpose != SCOUT) {
+                System.out.println(rc.getLocation());
+            }
             assert purpose == MINE_MN || purpose == SCOUT; // others not implemented yet
             if (purpose == MINE_MN) {
                 state = MINING;
@@ -86,7 +89,6 @@ public class Carrier extends Unit {
                 moveToward(miningHQLoc);
                 indicator += "going to drop";
             }
-
         }
 
         rc.setIndicatorString(indicator);

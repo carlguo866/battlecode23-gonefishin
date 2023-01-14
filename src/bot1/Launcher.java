@@ -18,16 +18,13 @@ public class Launcher extends Unit {
                     Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
                 }
             }
-            // set a random enemy HQ ID that I will prioritize
-            int start_i = rng.nextInt(4);
-            for (int i = start_i; i < start_i + 4; i++) {
-                if (Comm.enemyHQLocations[i % 4] != null) {
-                    enemyHQID = i % 4;
-                    enemyHQLoc = Comm.enemyHQLocations[i % 4];
-                    break;
-                }
-            }
-            assert enemyHQLoc != null;
+            // prioritize the closest enemy HQ
+            enemyHQID = getClosestID(Comm.enemyHQLocations);
+            enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
+        }
+        if (rc.getRoundNum() <= 3) {
+            // first two rounds just wait for the other two
+            return;
         }
         String indicator = "";
 

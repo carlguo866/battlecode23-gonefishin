@@ -39,10 +39,10 @@ public class Comm extends RobotPlayer {
     private static boolean needWellsUpdate = false;
 
     public static int numHQ = 0;
-    public static MapLocation[] friendlyHQLocations = new MapLocation[4];
+    public static MapLocation[] friendlyHQLocations = {null, null, null, null};
 
     public static int[] closestHQIDToWells = new int[4];
-    public static MapLocation[] closestWells = new MapLocation[4];
+    public static MapLocation[] closestWells = {null, null, null, null};
 
     public static final int SPAWN_Q_LENGTH = 10;
 
@@ -57,7 +57,7 @@ public class Comm extends RobotPlayer {
             }
         }
         // HQ update should only be done once, at turn 1 for all HQ, and at turn 0 for other units
-        if ((turnCount == 1 && rc.getType() == RobotType.HEADQUARTERS)
+        if ((turnCount <= 1 && rc.getType() == RobotType.HEADQUARTERS)
                 || (turnCount == 0 && rc.getType() != RobotType.HEADQUARTERS)) {
             updateHQLocations();
         }
@@ -68,7 +68,7 @@ public class Comm extends RobotPlayer {
     }
 
     // IMPORTANT: always ensure that any write op is performed when writable
-    public static void turn_ends() throws GameActionException {
+    public static void commit_write() throws GameActionException {
         for (int i = 0; i < ARRAY_LENGTH; i++) {
             if (is_array_changed[i]) {
                 rc.writeSharedArray(i, buffered_share_array[i]);

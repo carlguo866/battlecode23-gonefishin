@@ -31,6 +31,7 @@ public class Carrier extends Unit {
                 if (location != null && location.compareTo(rc.getLocation()) == 0) {
                     purpose = Comm.getSpawnQFlag(i);
                     Comm.setSpawnQ(i, -1, -1, 0);
+                    Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
                 }
             }
             assert purpose == MINE_MN || purpose == SCOUT; // others not implemented yet

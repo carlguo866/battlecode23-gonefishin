@@ -151,18 +151,9 @@ public class Launcher extends Unit {
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
                     follow(furthestFriendlyLauncher.location);
                 } else {
-                    if (rc.getRoundNum() <= 15) {
-                        // first few turns move toward center of the HQs
-                        int x = 0, y = 0;
-                        for (int i = 0; i < 4; i++) {
-                            if (Comm.friendlyHQLocations[i] != null) {
-                                x += Comm.friendlyHQLocations[i].x;
-                                y += Comm.friendlyHQLocations[i].y;
-                            }
-                        }
-                        x /= Comm.numHQ;
-                        y /= Comm.numHQ;
-                        moveToward(new MapLocation(x, y));
+                    if (rc.getRoundNum() <= 12) {
+                        // first few turns move toward center of the map
+                        moveToward(new MapLocation(rc.getMapWidth()/2, rc.getMapHeight()/2));
                     } else {
                         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
                         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {

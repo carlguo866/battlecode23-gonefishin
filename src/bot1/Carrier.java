@@ -22,6 +22,8 @@ public class Carrier extends Unit {
     public static final int SCOUTING = 201;
     public static final int REPORTING_INFO = 201;
 
+    public static final int ANCHORING = 301;
+
     public static int purpose = AWAIT_CMD;
     public static int state = 0;
     public static ResourceType resourceType;
@@ -29,6 +31,7 @@ public class Carrier extends Unit {
 
     public static MapLocation lastEnemyLoc = null;
     public static int lastEnemyRound = 0;
+    public static RobotInfo closestEnemy = null;
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
@@ -43,7 +46,6 @@ public class Carrier extends Unit {
             if (purpose != MINE_MN && purpose != SCOUT) {
                 purpose = MINE_MN;
             }
-//            assert purpose == MINE_MN || purpose == SCOUT; // others not implemented yet
             if (purpose == MINE_MN) {
                 state = MINING;
                 resourceType = ResourceType.values()[purpose];
@@ -56,60 +58,40 @@ public class Carrier extends Unit {
             }
         }
 
-        RobotInfo closestEnemy = null;
-        int dis = Integer.MAX_VALUE;
-        for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
-            if (robot.type == RobotType.LAUNCHER) {
-                int newDis = robot.location.distanceSquaredTo(rc.getLocation());
-                if (closestEnemy == null || newDis < dis) {
-                    newDis = dis;
-                    closestEnemy = robot;
-                }
+        if (state == ANCHORING) {
+            indicator += "anchoring";
+            int[] islands = rc.senseNearbyIslands();
+            if (rc.canPlaceAnchor()) {
+                rc.placeAnchor();
+                state = MINING;
+                return;
             }
-        }
-        if (closestEnemy != null) {
-            lastEnemyLoc = closestEnemy.location;
-            lastEnemyRound = rc.getRoundNum();
-            if (rc.canAttack(closestEnemy.location)) {
-                indicator += "attack,";
-                rc.attack(closestEnemy.location);
-            } else { // no resource or too far away
-                if (rc.getWeight() >= 20) { // ow not worth it to get close to attack
-                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location);
-                    Direction[] dirs = {forwardDir.rotateRight().rotateRight(), forwardDir.rotateLeft().rotateLeft(),
-                            forwardDir.rotateLeft(), forwardDir.rotateRight(), forwardDir};
-                    for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
-                                && rc.canMove(dir)) {
-                            rc.move(dir);
-                            assert rc.canAttack(closestEnemy.location);
-                            indicator += "goattack,";
-                            if (rc.canAttack(closestEnemy.location)) {
-                                rc.attack(closestEnemy.location);
-                            }
-                        }
-                    }
+            MapLocation targetLoc = null;
+            int dis = Integer.MAX_VALUE;
+            for (int island : islands) {
+                if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
+                    // we can't place here
+                    continue;
                 }
-                // If I can move and still have stuff, throw it all away, just don't hit a teammate
-                if (rc.isMovementReady() && rc.getWeight() > 0) {
-                    for (int i = 1; i <= 20; i++) {
-                        MapLocation loc = new MapLocation(rc.getLocation().x + BFS25[i][0],
-                                rc.getLocation().y + BFS25[i][1]);
-                        if (rc.onTheMap(loc) && rc.canSenseLocation(loc)) {
-                            RobotInfo robot = rc.senseRobotAtLocation(loc);
-                            if (robot == null || robot.team != myTeam || robot.type == RobotType.HEADQUARTERS) {
-                                if (rc.canAttack(loc)) {
-                                    rc.attack(loc);
-                                    indicator += String.format("throw %s,", loc);
-                                    break;
-                                }
-                            }
-                        }
+                MapLocation locs[] = rc.senseNearbyIslandLocations(island);
+                for (MapLocation loc : locs) {
+                    if (rc.getLocation().distanceSquaredTo(loc) < dis) {
+                        targetLoc = loc;
+                        dis = rc.getLocation().distanceSquaredTo(loc);
                     }
                 }
             }
-            state = RUNAWAY_AND_REPORT;
+            if (targetLoc == null) {
+                randomMove();
+            } else {
+                indicator += targetLoc;
+                moveToward(targetLoc);
+            }
+            return; // in state anchoring, ignore everything else (We should have controlled the map anyways)
         }
+
+        senseEnemy();
+        checkAnchor();
 
         if (state == RUNAWAY_AND_REPORT) {
             indicator += "goreport,";
@@ -196,5 +178,74 @@ public class Carrier extends Unit {
             }
         }
 
+    }
+
+    // sense and attack nearby enemies
+    private static void senseEnemy() throws GameActionException {
+        int dis = Integer.MAX_VALUE;
+        for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
+            if (robot.type == RobotType.LAUNCHER) {
+                int newDis = robot.location.distanceSquaredTo(rc.getLocation());
+                if (closestEnemy == null || newDis < dis) {
+                    newDis = dis;
+                    closestEnemy = robot;
+                }
+            }
+        }
+        if (closestEnemy != null) {
+            lastEnemyLoc = closestEnemy.location;
+            lastEnemyRound = rc.getRoundNum();
+            if (rc.canAttack(closestEnemy.location)) {
+                indicator += "attack,";
+                rc.attack(closestEnemy.location);
+            } else { // no resource or too far away
+                if (rc.getWeight() >= 20) { // ow not worth it to get close to attack
+                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location);
+                    Direction[] dirs = {forwardDir.rotateRight().rotateRight(), forwardDir.rotateLeft().rotateLeft(),
+                            forwardDir.rotateLeft(), forwardDir.rotateRight(), forwardDir};
+                    for (Direction dir : dirs) {
+                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                                && rc.canMove(dir)) {
+                            rc.move(dir);
+                            assert rc.canAttack(closestEnemy.location);
+                            indicator += "goattack,";
+                            if (rc.canAttack(closestEnemy.location)) {
+                                rc.attack(closestEnemy.location);
+                            }
+                        }
+                    }
+                }
+                // If I can move and still have stuff, throw it all away, just don't hit a teammate
+                if (rc.isMovementReady() && rc.getWeight() > 0) {
+                    for (int i = 1; i <= 20; i++) {
+                        MapLocation loc = new MapLocation(rc.getLocation().x + BFS25[i][0],
+                                rc.getLocation().y + BFS25[i][1]);
+                        if (rc.onTheMap(loc) && rc.canSenseLocation(loc)) {
+                            RobotInfo robot = rc.senseRobotAtLocation(loc);
+                            if (robot == null || robot.team != myTeam || robot.type == RobotType.HEADQUARTERS) {
+                                if (rc.canAttack(loc)) {
+                                    rc.attack(loc);
+                                    indicator += String.format("throw %s,", loc);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            state = RUNAWAY_AND_REPORT;
+        }
+    }
+
+    private static void checkAnchor() throws GameActionException {
+        for (int i = 0; i < 4; i++) {
+            MapLocation loc = Comm.friendlyHQLocations[i];
+            if (loc != null && rc.getLocation().isAdjacentTo(loc)) {
+                if (rc.canTakeAnchor(loc, Anchor.STANDARD)) {
+                    rc.takeAnchor(loc, Anchor.STANDARD);
+                    state = ANCHORING;
+                }
+            }
+        }
     }
 }

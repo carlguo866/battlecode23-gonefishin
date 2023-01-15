@@ -22,11 +22,13 @@ import battlecode.common.*;
  * 12 bit: coord
  * 4 bit flag
  *
- * enemy report starting bit 224
- * length: 4
+ * enemy report starting bit 224 - 247
  * each of:
  * 12 bit: coord
  * 12 bits: last seen round number, could be % 64 later
+ *
+ * Anchor stuff bit 248
+ * 4 bit signifying if each HQ has anchor
  *
  * 35 islands
  * each 12(6) bits for pos, 4 flags for if conquered

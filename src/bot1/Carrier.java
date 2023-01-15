@@ -182,6 +182,7 @@ public class Carrier extends Unit {
 
     // sense and attack nearby enemies
     private static void senseEnemy() throws GameActionException {
+        closestEnemy = null;
         int dis = Integer.MAX_VALUE;
         for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
             if (robot.type == RobotType.LAUNCHER) {

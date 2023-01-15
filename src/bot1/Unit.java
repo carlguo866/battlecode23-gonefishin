@@ -20,23 +20,22 @@ public class Unit extends RobotPlayer {
     };
 
     // TODO path finding
-    // TODO deal with blow back current
     static void randomMove() throws GameActionException {
         int starting_i = rng.nextInt(directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
             Direction dir = directions[i % 8];
-            if (rc.canMove(dir)) rc.move(dir);
+            if (rc.canMove(dir) && rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() == Direction.CENTER) rc.move(dir);
         }
     }
 
     static void follow(MapLocation location) throws GameActionException {
         if (rc.isMovementReady()) {
             Direction dir = rc.getLocation().directionTo(location);
-            if (rc.canMove(dir)) {
+            if (rc.canMove(dir) && rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() == Direction.CENTER) {
                 rc.move(dir);
-            } else if (rc.canMove(dir.rotateRight())) {
+            } else if (rc.canMove(dir.rotateRight()) && rc.senseMapInfo(rc.getLocation().add(dir.rotateRight())).getCurrentDirection() == Direction.CENTER) {
                 rc.move(dir.rotateRight());
-            } else if (rc.canMove(dir.rotateLeft())) {
+            } else if (rc.canMove(dir.rotateLeft()) && rc.senseMapInfo(rc.getLocation().add(dir.rotateLeft())).getCurrentDirection() == Direction.CENTER) {
                 rc.move(dir.rotateLeft());
             } else {
                 randomMove();
@@ -79,7 +78,8 @@ public class Unit extends RobotPlayer {
         if (rc.isMovementReady()) {
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
-                while (!rc.canMove(dir) && pathingCnt != 8) {
+                while ((!rc.canMove(dir) || rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() != Direction.CENTER) 
+                        && pathingCnt != 8) {
                     MapLocation loc = rc.getLocation().add(dir);
                     if (rc.onTheMap(loc) && rc.senseRobotAtLocation(loc) != null) {
                         // a robot is blocking our way, reset and use follow instead
@@ -102,16 +102,18 @@ public class Unit extends RobotPlayer {
                 }
             } else {
                 while (pathingCnt > 0
-                        && rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1])).isPassable()) {
+                        && (rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1])).isPassable() && 
+                        rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1])).getCurrentDirection() == Direction.CENTER)) {
                     pathingCnt--;
                 }
                 while (pathingCnt > 0 &&
-                        !rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).isPassable()) {
+                        (!rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).isPassable() ||
+                        rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).getCurrentDirection() != Direction.CENTER)) {
                     prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();;
                     pathingCnt++;
                 }
                 Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
-                if (rc.canMove(moveDir)) {
+                if (rc.canMove(moveDir) && rc.senseMapInfo(rc.getLocation().add(moveDir)).getCurrentDirection() == Direction.CENTER) {
                     rc.move(moveDir);
                 } else {
                     // a robot blocking us while we are following wall, wait

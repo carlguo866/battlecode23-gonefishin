@@ -80,7 +80,7 @@ public class Launcher extends Unit {
             if (rc.isMovementReady()) {
                 // move toward enemy if sensed an enemy outside attack range
                 if (rc.isActionReady()) {
-                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location);
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
                     for (Direction dir : dirs) {

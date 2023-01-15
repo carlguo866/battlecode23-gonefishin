@@ -34,5 +34,21 @@ public class Headquarter extends Unit {
                 Comm.setSpawnQ(rc.getID() / 2, location.x, location.y, Carrier.MINE_MN);
             }
         }
+
+        RobotInfo closestEnemy = null;
+        int dis = Integer.MAX_VALUE;
+        for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
+            if (robot.type == RobotType.LAUNCHER) {
+                int newDis = rc.getLocation().distanceSquaredTo(robot.location);
+                if (newDis < dis) {
+                    closestEnemy = robot;
+                    dis = newDis;
+                }
+            }
+        }
+        if (closestEnemy != null) {
+            Comm.reportEnemy(closestEnemy.location, rc.getRoundNum());
+        }
+        indicator += String.format("enemy %s round %d", Comm.getEnemyLoc(), Comm.getEnemyRound());
     }
 }

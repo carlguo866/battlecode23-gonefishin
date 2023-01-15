@@ -1,9 +1,6 @@
 package rushbot;
 
-import battlecode.common.Direction;
-import battlecode.common.GameActionException;
-import battlecode.common.MapLocation;
-import battlecode.common.ResourceType;
+import battlecode.common.*;
 
 public class Carrier extends Unit {
     private static final int MAX_WEIGHT = 40; // tunable later

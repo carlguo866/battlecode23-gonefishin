@@ -16,22 +16,26 @@ import battlecode.common.*;
  * 2 bits: closest HQ ID
  * 12 bits: well location
  *
- * spawn queue starting at bit 138
- * length: 10
- * each of 16 bits, total of 160 bits
+ * spawn queue bit 160 - 223
+ * length: 4
+ * each of 16 bits, total of 64 bits
  * 12 bit: coord
  * 4 bit flag
  *
- * Launcher cmd 20bits
- * go where to fight
+ * enemy report starting bit 224
+ * length: 4
+ * each of:
+ * 12 bit: coord
+ * 12 bits: last seen round number, could be % 64 later
  *
  * 35 islands
  * each 12(6) bits for pos, 4 flags for if conquered
  */
 public class Comm extends RobotPlayer {
-    private static final int ARRAY_LENGTH = 64;
+    private static final int ARRAY_LENGTH = 20; // this is how much we use rn
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 160;
+    private static final int ENEMY_BIT = 224;
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -110,7 +114,6 @@ public class Comm extends RobotPlayer {
     }
 
     // well infos starting
-
     public static void updateWells() {
         for (int resourceID = 1; resourceID <= 2; resourceID++) {
             int startingBit = WELL_INFO_BIT + (resourceID - 1) * 14;
@@ -179,6 +182,28 @@ public class Comm extends RobotPlayer {
         writeBits(SPAWN_Q_BIT + index * 16, 6, x + 1);
         writeBits(SPAWN_Q_BIT + index * 16 + 6, 6, y + 1);
         writeBits(SPAWN_Q_BIT + index * 16 + 12, 4, flag);
+    }
+
+    // enemy report starting
+    public static void reportEnemy(MapLocation location, int roundNumber) {
+        if (getEnemyLoc() != null && roundNumber <= getEnemyRound()) { // ignore old report
+            return;
+        }
+        writeBits(ENEMY_BIT, 6, location.x + 1);
+        writeBits(ENEMY_BIT + 6, 6, location.y + 1);
+        writeBits(ENEMY_BIT + 12, 12, roundNumber);
+    }
+
+    public static MapLocation getEnemyLoc() {
+        int x = readBits(ENEMY_BIT, 6);
+        int y = readBits(ENEMY_BIT + 6, 6);
+        if (x == 0 && y == 0)
+            return null;
+        return new MapLocation(x - 1, y - 1);
+    }
+
+    public static int getEnemyRound() {
+        return readBits(ENEMY_BIT + 12, 12);
     }
 
     // helper funcs

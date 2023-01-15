@@ -75,10 +75,8 @@ public class Unit extends RobotPlayer {
         }
         lastPathingTarget = location;
         lastPathingTurn = turnCount;
-        indicator += String.format("pfinding_cnt %d,", pathingCnt);
 
-        // use while since carrier can move twice in turn
-        while (rc.isMovementReady()) {
+        if (rc.isMovementReady()) {
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
                 while (!rc.canMove(dir) && pathingCnt != 8) {

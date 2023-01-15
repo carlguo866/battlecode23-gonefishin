@@ -81,7 +81,7 @@ public class Launcher extends Unit {
             if (rc.isMovementReady()) {
                 // move toward enemy if sensed an enemy outside attack range
                 if (rc.isActionReady()) {
-                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location);
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
                     for (Direction dir : dirs) {
@@ -114,10 +114,17 @@ public class Launcher extends Unit {
                 indicator += String.format("Following master %d at %s", masterLauncher.getID(), masterLauncher.location);
                 follow(masterLauncher.location);
             } else { // I am the master
-                // if there is a launcher going far away while there are few launchers,
-                // most likely it has seen something, follow him
-                if (dis >= 9 && friendlyLauncherCnt <= 3) {
-                    indicator += String.format("Master following %s", furthestFriendlyLauncher.location);
+                // If enemy reported recently that is closer than the target HQ, fight enemy
+                MapLocation enemyLocation = Comm.getEnemyLoc();
+                if (enemyLocation != null
+                        && rc.getRoundNum() - Comm.getEnemyRound() <= 50
+                        && rc.getLocation().distanceSquaredTo(enemyHQLoc) * 4 >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
+                    moveToward(enemyLocation);
+                    indicator += String.format("M2E@%s", enemyLocation);
+                } else if (dis >= 9 && friendlyLauncherCnt <= 3) {
+                    // if there is a launcher going far away while there are few launchers,
+                    // most likely it has seen something, follow him
+                    indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
                     follow(furthestFriendlyLauncher.location);
                 } else {
                     // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
@@ -130,7 +137,7 @@ public class Launcher extends Unit {
                             }
                         }
                     }
-                    indicator += String.format("M2E@%s", enemyHQLoc);
+                    indicator += String.format("M2EHQ@%s", enemyHQLoc);
                     moveToward(enemyHQLoc);
                 }
             }

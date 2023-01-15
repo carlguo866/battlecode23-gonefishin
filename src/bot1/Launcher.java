@@ -1,43 +1,34 @@
 package bot1;
 
 import battlecode.common.*;
-import static bot1.Constants.*;
 
 public class Launcher extends Unit {
     private static final int ATTACK_DIS = 16;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 
-    static void run () throws GameActionException {
-        if (turnCount == 0) {
-            // reset the spawn flag
-            for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
-                MapLocation location = Comm.getSpawnQLoc(i);
-                if (location != null && location.compareTo(rc.getLocation()) == 0) {
-                    int purpose = Comm.getSpawnQFlag(i);
-                    Comm.setSpawnQ(i, -1, -1, 0);
-                    Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
-                }
-            }
-            // prioritize the closest enemy HQ
-            enemyHQID = getClosestID(Comm.enemyHQLocations);
-            enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
-        }
-        if (rc.getRoundNum() <= 3) {
-            // first two rounds just wait for the other two
-            return;
-        }
+    static int clearedUntilRound = 0; // to mark if enemy has been cleared
 
+    // micro vars
+    static RobotInfo attackTarget = null;
+    static RobotInfo closestEnemy = null;
+    static int ourTeamStrength = 2;
+    // macro vars
+    static RobotInfo masterLauncher = null;
+    static int dis = 0;
+    static int friendlyLauncherCnt = 1;
+    static RobotInfo furthestFriendlyLauncher = null;
+
+    static void sense() {
         // micro vars
-        RobotInfo attackTarget = null;
-        RobotInfo closestEnemy = null;
-        int ourTeamStrength = 2;
+        attackTarget = null;
+        closestEnemy = null;
+        ourTeamStrength = 2;
         // macro vars
-        RobotInfo masterLauncher = null;
-        int dis = 0;
-        int friendlyLauncherCnt = 1;
-        RobotInfo furthestFriendlyLauncher = null;
-
+        masterLauncher = null;
+        dis = 0;
+        friendlyLauncherCnt = 1;
+        furthestFriendlyLauncher = null;
         for (RobotInfo robot : rc.senseNearbyRobots()) {
             if (robot.team == myTeam) {
                 if (robot.type == RobotType.LAUNCHER) {
@@ -73,7 +64,9 @@ public class Launcher extends Unit {
                 }
             }
         }
-        // micro if an enemy is sensed
+    }
+
+    static void micro() throws GameActionException {
         if (closestEnemy != null) {
             if (attackTarget != null && rc.canAttack(attackTarget.location)) {
                 rc.attack(attackTarget.location);
@@ -108,7 +101,32 @@ public class Launcher extends Unit {
                 }
             }
             indicator += String.format("Micro strength %d target %s", ourTeamStrength, attackTarget.location);
-        } else { // macro
+        }
+    }
+
+    static void run () throws GameActionException {
+        if (turnCount == 0) {
+            // reset the spawn flag
+            for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
+                MapLocation location = Comm.getSpawnQLoc(i);
+                if (location != null && location.compareTo(rc.getLocation()) == 0) {
+                    int purpose = Comm.getSpawnQFlag(i);
+                    Comm.setSpawnQ(i, -1, -1, 0);
+                    Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
+                }
+            }
+            // prioritize the closest enemy HQ
+            enemyHQID = getClosestID(Comm.enemyHQLocations);
+            enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
+        }
+        if (rc.getRoundNum() <= 3) {
+            // first two rounds just wait for the other two to join and move together
+            return;
+        }
+
+        sense();
+        micro();
+        if (closestEnemy == null) { // macro
             // the launcher with the smallest ID is the master, everyone follows him
             if (masterLauncher != null) {
                 indicator += String.format("Following master %d at %s", masterLauncher.getID(), masterLauncher.location);
@@ -118,30 +136,52 @@ public class Launcher extends Unit {
                 MapLocation enemyLocation = Comm.getEnemyLoc();
                 if (enemyLocation != null
                         && rc.getRoundNum() - Comm.getEnemyRound() <= 50
+                        && Comm.getEnemyRound() > clearedUntilRound
                         && rc.getLocation().distanceSquaredTo(enemyHQLoc) * 4 >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
-                    moveToward(enemyLocation);
-                    indicator += String.format("M2E@%s", enemyLocation);
+                    if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
+                        // enemy has been cleared
+                        clearedUntilRound = rc.getRoundNum();
+                    } else {
+                        moveToward(enemyLocation);
+                        indicator += String.format("M2E@%s", enemyLocation);
+                    }
                 } else if (dis >= 9 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
                     follow(furthestFriendlyLauncher.location);
                 } else {
-                    // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
-                    if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
-                        for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
-                            if (Comm.enemyHQLocations[i % 4] != null) {
-                                enemyHQID = i % 4;
-                                enemyHQLoc = Comm.enemyHQLocations[i % 4];
-                                break;
+                    if (rc.getRoundNum() <= 15) {
+                        // first few turns move toward center of the HQs
+                        int x = 0, y = 0;
+                        for (int i = 0; i < 4; i++) {
+                            if (Comm.friendlyHQLocations[i] != null) {
+                                x += Comm.friendlyHQLocations[i].x;
+                                y += Comm.friendlyHQLocations[i].y;
                             }
                         }
+                        x /= Comm.numHQ;
+                        y /= Comm.numHQ;
+                        moveToward(new MapLocation(x, y));
+                    } else {
+                        // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
+                        if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
+                            for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
+                                if (Comm.enemyHQLocations[i % 4] != null) {
+                                    enemyHQID = i % 4;
+                                    enemyHQLoc = Comm.enemyHQLocations[i % 4];
+                                    break;
+                                }
+                            }
+                        }
+                        indicator += String.format("M2EHQ@%s", enemyHQLoc);
+                        moveToward(enemyHQLoc);
                     }
-                    indicator += String.format("M2EHQ@%s", enemyHQLoc);
-                    moveToward(enemyHQLoc);
                 }
             }
         }
+        sense();
+        micro();
     }
 
     private static RobotInfo targetPriority(RobotInfo r1, RobotInfo r2) {

@@ -95,12 +95,14 @@ public class Carrier extends Unit {
                     for (int i = 1; i <= 20; i++) {
                         MapLocation loc = new MapLocation(rc.getLocation().x + BFS25[i][0],
                                 rc.getLocation().y + BFS25[i][1]);
-                        if (!rc.onTheMap(loc)) continue;
-                        RobotInfo robot = rc.senseRobotAtLocation(loc);
-                        if (robot == null || robot.team != myTeam || robot.type == RobotType.HEADQUARTERS) {
-                            if (rc.canAttack(loc)) {
-                                rc.attack(loc);
-                                indicator += String.format("throw %s,", loc);
+                        if (rc.onTheMap(loc) && rc.canSenseLocation(loc)) {
+                            RobotInfo robot = rc.senseRobotAtLocation(loc);
+                            if (robot == null || robot.team != myTeam || robot.type == RobotType.HEADQUARTERS) {
+                                if (rc.canAttack(loc)) {
+                                    rc.attack(loc);
+                                    indicator += String.format("throw %s,", loc);
+                                    break;
+                                }
                             }
                         }
                     }

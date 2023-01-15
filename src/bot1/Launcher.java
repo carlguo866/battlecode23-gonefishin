@@ -4,6 +4,7 @@ import battlecode.common.*;
 import static bot1.Constants.*;
 
 public class Launcher extends Unit {
+    private static final int ATTACK_DIS = 16;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 
@@ -72,16 +73,39 @@ public class Launcher extends Unit {
                 }
             }
         }
-        // macro if an enemy is sensed
+        // micro if an enemy is sensed
         if (closestEnemy != null) {
             if (attackTarget != null && rc.canAttack(attackTarget.location)) {
                 rc.attack(attackTarget.location);
             }
-            // move toward enemy if favored, ow go away
-            if (ourTeamStrength >= 0) {
-                moveToward(closestEnemy.location);
-            } else {
-                moveToward(rc.getLocation().add(rc.getLocation().directionTo(closestEnemy.location).opposite()));
+            if (rc.isMovementReady()) {
+                // move toward enemy if sensed an enemy outside attack range
+                if (rc.isActionReady()) {
+                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                    Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
+                            forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
+                    for (Direction dir : dirs) {
+                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                                && rc.canMove(dir)) {
+                            rc.move(dir);
+                            if (rc.canAttack(closestEnemy.location)) {
+                                rc.attack(closestEnemy.location);
+                            }
+                        }
+                    }
+                } else {
+                    // if I can back off to a location that I can still attack from, kite back
+                    Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                    Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
+                            backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
+                    for (Direction dir : dirs) {
+                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                                && rc.canMove(dir)) {
+                            rc.move(dir);
+                            break;
+                        }
+                    }
+                }
             }
             indicator += String.format("Micro strength %d target %s", ourTeamStrength, attackTarget.location);
         } else { // macro

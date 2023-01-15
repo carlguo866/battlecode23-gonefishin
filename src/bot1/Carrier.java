@@ -4,7 +4,6 @@ import battlecode.common.*;
 
 public class Carrier extends Unit {
     private static final int MAX_WEIGHT = 40; // tunable later
-    private static String indicator;
 
     public static final int AWAIT_CMD = 0;
     // for mining purposes, int value equal ResourceType
@@ -50,7 +49,7 @@ public class Carrier extends Unit {
             }
         }
 
-        indicator = String.format("purpose %d,", purpose);
+        indicator += String.format("purpose %d,", purpose);
 
         if (state == MINING) {
             assert Comm.closestWells[resourceType.resourceID] != null;
@@ -91,6 +90,5 @@ public class Carrier extends Unit {
             }
         }
 
-        rc.setIndicatorString(indicator);
     }
 }

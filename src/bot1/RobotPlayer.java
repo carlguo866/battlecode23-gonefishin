@@ -17,6 +17,8 @@ public strictfp class RobotPlayer {
     static Team myTeam;
     static Team oppTeam;
 
+    public static String indicator;
+
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * It is like the main function for your robot. If this method returns, the robot dies!
@@ -31,13 +33,11 @@ public strictfp class RobotPlayer {
         oppTeam = rc.getTeam().opponent();
         turnCount = 0;
 
-        rc.setIndicatorString("Hello world!");
-
-
         while (true) {
 
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode.
             try {
+                indicator = "";
                 Comm.turn_starts();
                 switch (rc.getType()) {
                     case HEADQUARTERS: Headquarter.run();  break;
@@ -48,6 +48,7 @@ public strictfp class RobotPlayer {
                     case AMPLIFIER:       break;
                 }
                 Comm.commit_write();
+                rc.setIndicatorString(indicator);
             } catch (GameActionException e) {
                 // Oh no! It looks like we did something illegal in the Battlecode world. You should
                 // handle GameActionExceptions judiciously, in case unexpected events occur in the game
@@ -65,8 +66,8 @@ public strictfp class RobotPlayer {
                 // Signify we've done everything we want to do, thereby ending our turn.
                 // This will make our code wait until the next turn, and then perform this loop again.
                 Clock.yield();
+                turnCount += 1;
             }
-            turnCount += 1;
         }
 
         // Your code should never reach here (unless it's intentional)! Self-destruction imminent...

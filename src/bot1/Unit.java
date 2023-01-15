@@ -77,7 +77,8 @@ public class Unit extends RobotPlayer {
         lastPathingTurn = turnCount;
         indicator += String.format("pfinding_cnt %d,", pathingCnt);
 
-        if (rc.isMovementReady()) {
+        // use while since carrier can move twice in turn
+        while (rc.isMovementReady()) {
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
                 while (!rc.canMove(dir) && pathingCnt != 8) {
@@ -99,9 +100,9 @@ public class Unit extends RobotPlayer {
                     // we are blocked in all directions, nothing to do
                     indicator += "perma blocked,";
                     pathingCnt = 0;
+                    return;
                 }
-            }
-            else {
+            } else {
                 while (pathingCnt > 0
                         && rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1])).isPassable()) {
                     pathingCnt--;
@@ -117,6 +118,7 @@ public class Unit extends RobotPlayer {
                 } else {
                     // a robot blocking us while we are following wall, wait
                     indicator += "blocked";
+                    return;
                 }
             }
         }

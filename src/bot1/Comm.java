@@ -35,6 +35,7 @@ public class Comm extends RobotPlayer {
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
+    private static boolean is_array_changed_total = false;
 
     private static boolean needWellsUpdate = false;
 
@@ -70,11 +71,14 @@ public class Comm extends RobotPlayer {
 
     // IMPORTANT: always ensure that any write op is performed when writable
     public static void commit_write() throws GameActionException {
-        for (int i = 0; i < ARRAY_LENGTH; i++) {
-            if (is_array_changed[i]) {
-                rc.writeSharedArray(i, buffered_share_array[i]);
-                is_array_changed[i] = false;
+        if (is_array_changed_total) {
+            for (int i = 0; i < ARRAY_LENGTH; i++) {
+                if (is_array_changed[i]) {
+                    rc.writeSharedArray(i, buffered_share_array[i]);
+                    is_array_changed[i] = false;
+                }
             }
+            is_array_changed_total = false;
         }
     }
 
@@ -108,7 +112,7 @@ public class Comm extends RobotPlayer {
     // well infos starting
 
     public static void updateWells() {
-        for (int resourceID = 1; resourceID <= 3; resourceID++) {
+        for (int resourceID = 1; resourceID <= 2; resourceID++) {
             int startingBit = WELL_INFO_BIT + (resourceID - 1) * 14;
             closestHQIDToWells[resourceID] = readBits(startingBit, 2);
             int x = readBits(startingBit + 2, 6);
@@ -198,6 +202,7 @@ public class Comm extends RobotPlayer {
             new_bit = new_bit > 0? 1 : 0;
             if (original_bit != new_bit) {
                 is_array_changed[i / 16] = true;
+                is_array_changed_total = true;
                 buffered_share_array[i / 16] ^= 1 << (15 - i % 16);
             }
         }

@@ -19,7 +19,7 @@ public class Carrier extends Unit {
     public static final int MINING = 100;
     public static final int DROPPING_RESOURCE = 101;
 
-    public static final int RUNAWAY_AND_REPORT = 110;
+    public static final int REPORT_AND_RUNAWAY = 110;
     public static final int RUNAWAY = 111;
 
     public static final int SCOUTING = 201;
@@ -29,7 +29,7 @@ public class Carrier extends Unit {
 
     public static int purpose = AWAIT_CMD;
     public static int state = 0;
-    public static ResourceType resourceType;
+    public static ResourceType miningResourceType;
     public static MapLocation miningWellLoc;
     public static MapLocation miningHQLoc;
 
@@ -40,6 +40,8 @@ public class Carrier extends Unit {
     // scouting vars
     static int startHQID;
     static Direction scoutDir;
+    static WellInfo[] wellsToReport = new WellInfo[300];
+    static int wellReportCnt = 0, wellSeenCnt = 0;
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
@@ -57,6 +59,7 @@ public class Carrier extends Unit {
             if (purpose == MINE_MN) {
                 int miningWellIndex = getClosestID(Comm.closestWells[purpose]);
                 miningWellLoc = Comm.closestWells[purpose][miningWellIndex];
+                miningResourceType = ResourceType.values()[purpose];
                 state = MINING;
             } else {
                 state = SCOUTING;
@@ -67,25 +70,32 @@ public class Carrier extends Unit {
             }
         }
 
+        checkAnchor();
         if (state == ANCHORING) {
             anchor();
             return; // in state anchoring, ignore everything else (We should have controlled the map anyways)
         }
 
+        if (state == SCOUTING) {
+            scoutSense();
+        }
         senseEnemy();
-        checkAnchor();
 
         if (state == SCOUTING) {
-            scout();
+            scoutMove();
         }
         if (state == SCOUTING) {
-            scout();
+            scoutSense();
+            scoutMove();
         }
 
-        if (state == RUNAWAY_AND_REPORT || state == RUNAWAY) {
+        if (state == REPORT_AND_RUNAWAY || state == REPORTING_INFO) {
+            report();
+        }
+
+        if (state == RUNAWAY) {
             runaway();
         }
-
 
         if (state == MINING) {
             if (rc.canCollectResource(miningWellLoc, -1)) {
@@ -115,12 +125,14 @@ public class Carrier extends Unit {
                 moveToward(miningWellLoc);
                 indicator += "going to mine,";
             }
-        } else if (state == DROPPING_RESOURCE) {
-            int amount = rc.getResourceAmount(resourceType);
+        }
+
+        if (state == DROPPING_RESOURCE) {
+            int amount = rc.getResourceAmount(miningResourceType);
             if (amount == 0) {
                 state = MINING;
-            } else if (rc.canTransferResource(miningHQLoc, resourceType, amount)) {
-                rc.transferResource(miningHQLoc, resourceType, amount);
+            } else if (rc.canTransferResource(miningHQLoc, miningResourceType, amount)) {
+                rc.transferResource(miningHQLoc, miningResourceType, amount);
                 indicator += "dropping";
             } else {
                 moveToward(miningHQLoc);
@@ -184,7 +196,7 @@ public class Carrier extends Unit {
                     }
                 }
             }
-            state = RUNAWAY_AND_REPORT;
+            state = REPORT_AND_RUNAWAY;
         }
     }
 
@@ -231,7 +243,22 @@ public class Carrier extends Unit {
         }
     }
 
-    private static void scout() throws GameActionException {
+    private static void scoutSense() {
+        for (WellInfo well : rc.senseNearbyWells()) {
+            boolean seenWell = false;
+            for (int i = 0; i < wellSeenCnt; i++) {
+                // FIXME inefficient
+                if (wellsToReport[i].getMapLocation() == well.getMapLocation()) {
+                    seenWell = true;
+                    break;
+                }
+            }
+            if (!seenWell) {
+                wellsToReport[wellSeenCnt++] = well;
+            }
+        }
+    }
+    private static void scoutMove() throws GameActionException {
         if (Math.sqrt(getClosestDis(Comm.enemyHQLocations)) - 3 <= Math.sqrt(getClosestDis(Comm.friendlyHQLocations))) {
             indicator += "close2E,endscout,";
             state = REPORTING_INFO;
@@ -254,6 +281,7 @@ public class Carrier extends Unit {
                 return;
             }
         }
+        // no need to go too close to edge in one direction
         if ((dx > 0 && rc.getMapWidth() - rc.getLocation().x <= 4)
                 || (dx < 0 && rc.getLocation().x <= 3)) {
             dx = 0;
@@ -277,30 +305,42 @@ public class Carrier extends Unit {
         tryMoveDir(scoutDir);
     }
 
-    private static void runaway() throws GameActionException {
-        if (state == RUNAWAY_AND_REPORT) {
+    private static boolean isNeedReport() {
+        return lastEnemyRound > Comm.getEnemyRound() || wellReportCnt < wellSeenCnt;
+    }
+
+    private static void report() throws GameActionException {
+        if (isNeedReport()) {
             indicator += "goreport,";
             int closestHQID = getClosestID(Comm.friendlyHQLocations);
-            if (rc.canWriteSharedArray(0, 0)) {
-                Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
-                Comm.commit_write();
-                state = RUNAWAY;
-            } else {
+            if (!rc.canWriteSharedArray(0, 0) && rc.isMovementReady()) {
                 moveToward(Comm.friendlyHQLocations[closestHQID]);
-                if (rc.canWriteSharedArray(0, 0)) {
+            }
+            if (!rc.canWriteSharedArray(0, 0) && rc.isMovementReady()) {
+                moveToward(Comm.friendlyHQLocations[closestHQID]);
+            }
+            if (rc.canWriteSharedArray(0, 0)) {
+                // do report
+                if (lastEnemyLoc != null) {
                     Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
-                    Comm.commit_write();
-                    state = RUNAWAY;
-                } else {
-                    moveToward(Comm.friendlyHQLocations[closestHQID]);
-                    if (rc.canWriteSharedArray(0, 0)) {
-                        Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
-                        Comm.commit_write();
-                        state = RUNAWAY;
-                    }
                 }
+                while(wellReportCnt < wellSeenCnt)
+                    Comm.reportWells(wellsToReport[wellReportCnt++]);
+                Comm.commit_write();
+            } else { // still can't write, wait for more moves and don't transition
+                return;
             }
         }
+        // state transitions
+        indicator += "notneedreport,";
+        if (state == REPORT_AND_RUNAWAY) {
+            state = RUNAWAY;
+        } else { // state == REPORT_INFO
+            state = 0; // TODO, transition into mining
+        }
+    }
+
+    private static void runaway() throws GameActionException {
         if (state == RUNAWAY) {
             indicator += "run,";
             if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {

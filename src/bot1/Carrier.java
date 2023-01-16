@@ -120,23 +120,31 @@ public class Carrier extends Unit {
                         if (rc.canMove(dir)) rc.move(dir);
                     }
                 }
-            } else if (rc.getWeight() >= MAX_WEIGHT) {
+            } else if (shouldStopMining()) {
                 int hqid = getClosestID(Comm.friendlyHQLocations);
                 miningHQLoc = Comm.friendlyHQLocations[hqid];
                 state = DROPPING_RESOURCE;
             } else {
                 // switch mine randomly if original too congested
-                if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 6) {
+                if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
                     for (int i = 0; i < 10; i++) {
                         MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
                         if (loc != null && !loc.equals(miningWellLoc)) {
                             miningWellLoc = loc;
-                            miningHQLoc = Comm.friendlyHQLocations[getClosestID(miningWellLoc, Comm.friendlyHQLocations)];
                             break;
                         }
                     }
                 }
                 moveToward(miningWellLoc);
+                if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
+                    for (int i = 0; i < 10; i++) {
+                        MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
+                        if (loc != null && !loc.equals(miningWellLoc)) {
+                            miningWellLoc = loc;
+                            break;
+                        }
+                    }
+                }
                 moveToward(miningWellLoc);
                 indicator += "going to mine,";
             }
@@ -160,6 +168,15 @@ public class Carrier extends Unit {
             }
         }
 
+    }
+
+    private static boolean shouldStopMining() {
+        if (rc.getWeight() >= MAX_WEIGHT)
+            return true;
+        // early game optim, get launcher out asap
+        if (rc.getRoundNum() <= 100 && (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 25 || rc.getResourceAmount(ResourceType.MANA) >= 30))
+            return true;
+        return false;
     }
 
     // sense and attack nearby enemies
@@ -396,7 +413,5 @@ public class Carrier extends Unit {
         }
         int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
         miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];
-        int miningHQIndex = getClosestID(miningWellLoc, Comm.friendlyHQLocations);
-        miningHQLoc = Comm.friendlyHQLocations[miningHQIndex];
     }
 }

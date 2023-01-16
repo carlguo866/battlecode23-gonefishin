@@ -30,11 +30,11 @@ public class Unit extends RobotPlayer {
 
     static void tryMoveDir(Direction dir) throws GameActionException {
         if (rc.isMovementReady()) {
-            if (rc.canMove(dir) && rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() == Direction.CENTER) {
+            if (rc.canMove(dir)) {
                 rc.move(dir);
-            } else if (rc.canMove(dir.rotateRight()) && rc.senseMapInfo(rc.getLocation().add(dir.rotateRight())).getCurrentDirection() == Direction.CENTER) {
+            } else if (rc.canMove(dir.rotateRight())) {
                 rc.move(dir.rotateRight());
-            } else if (rc.canMove(dir.rotateLeft()) && rc.senseMapInfo(rc.getLocation().add(dir.rotateLeft())).getCurrentDirection() == Direction.CENTER) {
+            } else if (rc.canMove(dir.rotateLeft())) {
                 rc.move(dir.rotateLeft());
             } else {
                 randomMove();
@@ -152,9 +152,9 @@ public class Unit extends RobotPlayer {
         if (dx == 0 && dy == -1) return Direction.SOUTH;
         if (dx == 1 && dy == 0) return Direction.EAST;
         if (dx == 1 && dy == 1) return Direction.NORTHEAST;
-        if (dx == 1 && dy == -1) return Direction.NORTHWEST;
+        if (dx == 1 && dy == -1) return Direction.SOUTHEAST;
         if (dx == -1 && dy == 0) return Direction.WEST;
-        if (dx == -1 && dy == 1) return Direction.SOUTHEAST;
+        if (dx == -1 && dy == 1) return Direction.NORTHWEST;
         if (dx == -1 && dy == -1) return Direction.SOUTHWEST;
         assert false; // shouldn't reach here
         return null;

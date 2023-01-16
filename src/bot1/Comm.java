@@ -16,13 +16,13 @@ import battlecode.common.*;
  * each type containing 3 coords repping the 3 wells
  * 12 bits: well location
  *
- * spawn queue bit 208 - 271
- * length: 4
- * each of 16 bits, total of 64 bits
+ * spawn queue bit 208 - 335
+ * length: 8
+ * each of 16 bits, total of 128 bits
  * 12 bit: coord
  * 4 bit flag
  *
- * enemy report starting bit 272 - 296
+ * enemy report starting bit 336
  * each of:
  * 12 bit: coord
  * 12 bits: last seen round number, could be % 64 later
@@ -35,7 +35,7 @@ import battlecode.common.*;
  * each 12(6) bits for pos, 4 flags for if conquered
  */
 public class Comm extends RobotPlayer {
-    private static final int ARRAY_LENGTH = 20; // this is how much we use rn
+    private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 272;
@@ -53,7 +53,7 @@ public class Comm extends RobotPlayer {
     public static int NUM_WELLS = 3; // number of wells stored per resource
     public static MapLocation[][] closestWells = new MapLocation[4][NUM_WELLS];
 
-    public static final int SPAWN_Q_LENGTH = 4;
+    public static final int SPAWN_Q_LENGTH = 8;
 
     public static void turn_starts() throws GameActionException {
         // TODO only update constant like variable (eg no spawn Q)
@@ -97,6 +97,7 @@ public class Comm extends RobotPlayer {
         // I am assuming HQIDs are < 8, one team using 0/2/4/6 and the other using 1/3/5/7
         assert(HQID < 8);
         HQID /= 2;
+        friendlyHQLocations[HQID] = location;
         writeBits(HQID * 12, 12, loc2int(location));
     }
 
@@ -135,6 +136,9 @@ public class Comm extends RobotPlayer {
             if (closestWells[resourceID][i] == null) {
                 updateIndex = i;
                 break;
+            }
+            if (closestWells[resourceID][i].equals(well.getMapLocation())){
+                return;
             }
             int original_dis = Unit.getClosestDis(closestWells[resourceID][i], friendlyHQLocations);
             if (original_dis > maxDis) {
@@ -187,29 +191,44 @@ public class Comm extends RobotPlayer {
     }
 
     // helper funcs
+    private static int read_Segment_of_bits(int left, int right, int rv){
+        int X = buffered_share_array[left/16];
+        int x = 16 - left%16, y = 15 - right%16;
+        int length = right - left + 1;
+        return (rv << length) + ((X%(1<<x))>>y);
+    }
+
     private static int readBits(int startingBitIndex, int length) {
+        int endingBitIndex = startingBitIndex + length - 1;
         int rv = 0;
-        for (int i = startingBitIndex; i < startingBitIndex + length; i++) {
-            int bit = buffered_share_array[i / 16] & (1 << (15 - i % 16)); //bit 0 = buf[0] & (1 << 15)
-            bit = bit > 0? 1 : 0;
-            rv += bit << (startingBitIndex + length - 1 - i);
+        int current = startingBitIndex;
+        while (current <= endingBitIndex){
+            int left = current;
+            int right = Math.min(left/16*16+15, endingBitIndex);
+            rv = read_Segment_of_bits (left, right, rv);
+            current = right + 1;
         }
         return rv;
     }
 
-    // TODO this needs optimization
     private static void writeBits(int startingBitIndex, int length, int value) {
         assert value < (1 << length);
-        for (int i = startingBitIndex; i < startingBitIndex + length; i++) {
-            int original_bit = buffered_share_array[i / 16] & (1 << (15 - i % 16)); //bit 0 = buf[0] & (1 << 15)
-            original_bit = original_bit > 0? 1 : 0;
-            int new_bit = value & (1 << (length - 1 - i + startingBitIndex)); // start: 6, length: 6, i: 7, shift: 4
-            new_bit = new_bit > 0? 1 : 0;
-            if (original_bit != new_bit) {
-                is_array_changed[i / 16] = true;
+        int current_ending = startingBitIndex + length - 1;
+        int current_length = length;
+        int current_value = value;
+        while (current_length > 0){
+            current_ending = startingBitIndex + current_length - 1;
+            int len = Math.min(current_ending%16+1, current_length);
+            int left = current_ending - len + 1;
+            int original_value = read_Segment_of_bits (left, current_ending, 0);
+            int new_value = current_value % (1 << len);
+            current_value >>= len;
+            if (new_value != original_value){
+                is_array_changed[current_ending / 16] = true;
                 is_array_changed_total = true;
-                buffered_share_array[i / 16] ^= 1 << (15 - i % 16);
+                buffered_share_array[current_ending / 16] ^= (new_value^original_value) << (15 - current_ending % 16);
             }
+            current_length -= len;
         }
     }
 
@@ -227,7 +246,7 @@ public class Comm extends RobotPlayer {
     }
 
     // sanity check func
-    public static void test_bit_ops() {
+    public static void test_bit_ops() throws GameActionException {
         writeBits(11, 10, 882);
         assert(readBits(11, 10) == 882);
         writeBits(8, 20, 99382);

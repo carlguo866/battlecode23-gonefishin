@@ -8,9 +8,9 @@ public class Carrier extends Unit {
 
     public static final int AWAIT_CMD = 0;
     // for mining purposes, int value equal ResourceType
-    public static final int MINE_AD = 1;
-    public static final int MINE_MN = 2;
-    public static final int MINE_EL = 3;
+    public static final int GO_MINE = 1;
+//    public static final int MINE_MN = 2;
+//    public static final int MINE_EL = 3;
     public static final int SCOUT_NE = 4;
     public static final int SCOUT_NW = 5;
     public static final int SCOUT_SE = 6;
@@ -23,7 +23,7 @@ public class Carrier extends Unit {
     public static final int RUNAWAY = 111;
 
     public static final int SCOUTING = 201;
-    public static final int REPORTING_INFO = 201;
+    public static final int REPORTING_INFO = 202;
 
     public static final int ANCHORING = 301;
 
@@ -47,16 +47,19 @@ public class Carrier extends Unit {
         if (turnCount == 0) {
             for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
                 MapLocation location = Comm.getSpawnQLoc(i);
-                if (location != null && location.compareTo(rc.getLocation()) == 0) {
+                if (location != null && location.equals(rc.getLocation())) {
                     purpose = Comm.getSpawnQFlag(i);
-                    startHQID = i;
+                    startHQID = i / 2;
                     Comm.setSpawnQ(i, -1, -1, 0);
                     Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
                     break;
                 }
             }
-            assert purpose != AWAIT_CMD;
-            if (purpose == MINE_MN) {
+            if (purpose == AWAIT_CMD) {
+                System.out.println("carrier spawn Q broken");
+                purpose = GO_MINE;
+            }
+            if (purpose == GO_MINE) {
                 int miningWellIndex = getClosestID(Comm.closestWells[purpose]);
                 miningWellLoc = Comm.closestWells[purpose][miningWellIndex];
                 miningResourceType = ResourceType.values()[purpose];
@@ -70,6 +73,7 @@ public class Carrier extends Unit {
             }
         }
 
+        indicator += String.format("state%d,", state);
         checkAnchor();
         if (state == ANCHORING) {
             anchor();
@@ -131,6 +135,7 @@ public class Carrier extends Unit {
             int amount = rc.getResourceAmount(miningResourceType);
             if (amount == 0) {
                 state = MINING;
+                findMineTarget();
             } else if (rc.canTransferResource(miningHQLoc, miningResourceType, amount)) {
                 rc.transferResource(miningHQLoc, miningResourceType, amount);
                 indicator += "dropping";
@@ -276,7 +281,8 @@ public class Carrier extends Unit {
         for (RobotInfo robot : rc.senseNearbyRobots(-1, myTeam)) {
             Direction dir = rc.getLocation().directionTo(robot.location);
             if (robot.type == RobotType.CARRIER && (dir == scoutDir || dir == scoutDir.rotateLeft() || dir == scoutDir.rotateRight())) {
-                indicator += "close2scout,endscout,";
+                indicator += String.format("scout%s", scoutDir);
+                indicator += String.format("dir%sendscout,", dir);
                 state = REPORTING_INFO;
                 return;
             }
@@ -286,7 +292,7 @@ public class Carrier extends Unit {
                 || (dx < 0 && rc.getLocation().x <= 3)) {
             dx = 0;
         }
-        if ((dy > 0 && rc.getMapWidth() - rc.getLocation().y <= 4)
+        if ((dy > 0 && rc.getMapHeight() - rc.getLocation().y <= 4)
                 || (dy < 0 && rc.getLocation().y <= 3)) {
             dy = 0;
         }
@@ -296,7 +302,7 @@ public class Carrier extends Unit {
             state = REPORTING_INFO;
             return;
         }
-        if (rc.getRoundNum() <= 12) {
+        if (rc.getRoundNum() >= 12) {
             indicator += "timereached,endscout";
             state = REPORTING_INFO;
             return;
@@ -336,7 +342,8 @@ public class Carrier extends Unit {
         if (state == REPORT_AND_RUNAWAY) {
             state = RUNAWAY;
         } else { // state == REPORT_INFO
-            state = 0; // TODO, transition into mining
+            findMineTarget();
+            state = MINING;
         }
     }
 
@@ -344,6 +351,7 @@ public class Carrier extends Unit {
         if (state == RUNAWAY) {
             indicator += "run,";
             if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
+                findMineTarget();
                 state = MINING;
             } else {
                 Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
@@ -362,5 +370,18 @@ public class Carrier extends Unit {
                 }
             }
         }
+    }
+
+    private static void findMineTarget() {
+        if (Comm.closestWells[ResourceType.MANA.resourceID][0] == null) {
+            miningResourceType = ResourceType.ADAMANTIUM;
+        } else {
+            // Mine AD with 1/3 prob if both mines available
+            miningResourceType = Constants.rng.nextInt(3) == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        }
+        int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
+        miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];
+        int miningHQIndex = getClosestID(miningWellLoc, Comm.friendlyHQLocations);
+        miningHQLoc = Comm.friendlyHQLocations[miningHQIndex];
     }
 }

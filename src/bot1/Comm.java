@@ -235,6 +235,19 @@ public class Comm extends RobotPlayer {
         }
     }
 
+    private static MapLocation int2loc(int val) {
+        if (val == 0) {
+            return null;
+        }
+        return new MapLocation(val / 64 - 1, val % 64 - 1);
+    }
+
+    private static int loc2int(MapLocation loc) {
+        if (loc == null)
+            return 0;
+        return ((loc.x + 1) * 64) + (loc.y + 1);
+    }
+
     // sanity check func
     public static void test_bit_ops() {
         writeBits(11, 10, 882);

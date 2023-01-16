@@ -30,7 +30,8 @@ public class Carrier extends Unit {
     public static int purpose = AWAIT_CMD;
     public static int state = 0;
     public static ResourceType resourceType;
-    public static MapLocation miningWellLoc, miningHQLoc;
+    public static MapLocation miningWellLoc;
+    public static MapLocation miningHQLoc;
 
     public static MapLocation lastEnemyLoc = null;
     public static int lastEnemyRound = 0;
@@ -54,15 +55,9 @@ public class Carrier extends Unit {
             }
             assert purpose != AWAIT_CMD;
             if (purpose == MINE_MN) {
-                resourceType = ResourceType.values()[purpose];
-                assert resourceType == ResourceType.MANA;
-                miningWellLoc = Comm.closestWells[purpose];
-                if (miningHQLoc == null) {
-                    state = SCOUTING;
-                    miningHQLoc = Comm.friendlyHQLocations[Comm.closestHQIDToWells[purpose]];
-                } else {
-                    state = MINING;
-                }
+                int miningWellIndex = getClosestID(Comm.closestWells[purpose]);
+                miningWellLoc = Comm.closestWells[purpose][miningWellIndex];
+                state = MINING;
             } else {
                 state = SCOUTING;
                 if (purpose == SCOUT_NE) scoutDir = Direction.NORTHEAST;
@@ -93,7 +88,6 @@ public class Carrier extends Unit {
 
 
         if (state == MINING) {
-            assert Comm.closestWells[resourceType.resourceID] != null;
             if (rc.canCollectResource(miningWellLoc, -1)) {
                 rc.collectResource(miningWellLoc, -1);
                 indicator += "collecting,";
@@ -113,6 +107,8 @@ public class Carrier extends Unit {
                     }
                 }
             } else if (rc.getWeight() >= MAX_WEIGHT) {
+                int hqid = getClosestID(Comm.friendlyHQLocations);
+                miningHQLoc = Comm.friendlyHQLocations[hqid];
                 state = DROPPING_RESOURCE;
             } else {
                 moveToward(miningWellLoc);
@@ -142,7 +138,7 @@ public class Carrier extends Unit {
             if (robot.type == RobotType.LAUNCHER) {
                 int newDis = robot.location.distanceSquaredTo(rc.getLocation());
                 if (closestEnemy == null || newDis < dis) {
-                    newDis = dis;
+                    dis = newDis;
                     closestEnemy = robot;
                 }
             }

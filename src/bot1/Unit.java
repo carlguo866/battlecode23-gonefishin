@@ -45,13 +45,13 @@ public class Unit extends RobotPlayer {
         tryMoveDir(rc.getLocation().directionTo(location));
     }
 
-    static int getClosestID(MapLocation[] locations) {
+    static int getClosestID(MapLocation fromLocation, MapLocation[] locations) {
         int dis = Integer.MAX_VALUE;
-        int rv = 0;
+        int rv = -1;
         for (int i = 0; i < locations.length; i++) {
             MapLocation location = locations[i];
             if (location != null) {
-                int newDis = rc.getLocation().distanceSquaredTo(location);
+                int newDis = fromLocation.distanceSquaredTo(location);
                 if (newDis < dis) {
                     rv = i;
                     dis = newDis;
@@ -61,10 +61,16 @@ public class Unit extends RobotPlayer {
         assert dis != Integer.MAX_VALUE;
         return rv;
     }
+    static int getClosestID(MapLocation[] locations) {
+        return getClosestID(rc.getLocation(), locations);
+    }
 
+    static int getClosestDis(MapLocation fromLocation, MapLocation[] locations) {
+        int id = getClosestID(fromLocation, locations);
+        return fromLocation.distanceSquaredTo(locations[id]);
+    }
     static int getClosestDis(MapLocation[] locations) {
-        int id = getClosestID(locations);
-        return rc.getLocation().distanceSquaredTo(locations[id]);
+        return getClosestDis(rc.getLocation(), locations);
     }
 
     // new path finding code from Ray

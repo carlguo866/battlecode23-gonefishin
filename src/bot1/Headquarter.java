@@ -26,7 +26,8 @@ public class Headquarter extends Unit {
                 MapLocation spawnLocation = rc.getLocation().add(dirToCenter).add(dirToCenter);
                 for (int[] dir : BFS25) {
                     MapLocation location = new MapLocation(spawnLocation.x + dir[0], spawnLocation.y + dir[1]);
-                    if(rc.canBuildRobot(RobotType.LAUNCHER, location)) {
+                    if(rc.canBuildRobot(RobotType.LAUNCHER, location)
+                            && rc.senseMapInfo(location).getCurrentDirection() == Direction.CENTER) {
                         rc.buildRobot(RobotType.LAUNCHER, location);
                         Comm.setSpawnQ(rc.getID() / 2, location.x, location.y, Carrier.MINE_MN);
                         break;
@@ -37,7 +38,8 @@ public class Headquarter extends Unit {
             if (turnCount >= 1 && Comm.closestWells[ResourceType.MANA.resourceID] != null) {
                 Direction direction = rc.getLocation().directionTo(Comm.closestWells[ResourceType.MANA.resourceID]);
                 MapLocation location = rc.getLocation().add(direction);
-                if(rc.canBuildRobot(RobotType.CARRIER, location)) {
+                if(rc.canBuildRobot(RobotType.CARRIER, location)
+                        && rc.senseMapInfo(location).getCurrentDirection() == Direction.CENTER) {
                     rc.buildRobot(RobotType.CARRIER, location);
                     Comm.setSpawnQ(rc.getID() / 2, location.x, location.y, Carrier.MINE_MN);
                 }

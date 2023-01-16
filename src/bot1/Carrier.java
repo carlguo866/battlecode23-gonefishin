@@ -125,6 +125,17 @@ public class Carrier extends Unit {
                 miningHQLoc = Comm.friendlyHQLocations[hqid];
                 state = DROPPING_RESOURCE;
             } else {
+                // switch mine randomly if original too congested
+                if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 6) {
+                    for (int i = 0; i < 10; i++) {
+                        MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
+                        if (loc != null && !loc.equals(miningWellLoc)) {
+                            miningWellLoc = loc;
+                            miningHQLoc = Comm.friendlyHQLocations[getClosestID(miningWellLoc, Comm.friendlyHQLocations)];
+                            break;
+                        }
+                    }
+                }
                 moveToward(miningWellLoc);
                 moveToward(miningWellLoc);
                 indicator += "going to mine,";
@@ -132,12 +143,16 @@ public class Carrier extends Unit {
         }
 
         if (state == DROPPING_RESOURCE) {
-            int amount = rc.getResourceAmount(miningResourceType);
-            if (amount == 0) {
+            int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
+            int mn = rc.getResourceAmount(ResourceType.MANA);
+            if (rc.getWeight() == 0) {
                 state = MINING;
                 findMineTarget();
-            } else if (rc.canTransferResource(miningHQLoc, miningResourceType, amount)) {
-                rc.transferResource(miningHQLoc, miningResourceType, amount);
+            } else if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
+                rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
+                indicator += "dropping";
+            } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
+                rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
                 indicator += "dropping";
             } else {
                 moveToward(miningHQLoc);

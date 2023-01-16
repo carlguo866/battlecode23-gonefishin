@@ -137,7 +137,7 @@ public class Launcher extends Unit {
                 if (enemyLocation != null
                         && rc.getRoundNum() - Comm.getEnemyRound() <= 50
                         && Comm.getEnemyRound() > clearedUntilRound
-                        && rc.getLocation().distanceSquaredTo(enemyHQLoc) * 4 >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
+                        && rc.getLocation().distanceSquaredTo(enemyHQLoc) >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
                     if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
                         // enemy has been cleared
                         clearedUntilRound = rc.getRoundNum();

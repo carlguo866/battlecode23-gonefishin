@@ -87,15 +87,28 @@ public class Launcher extends Unit {
                         }
                     }
                 } else {
-                    // if I can back off to a location that I can still attack from, kite back
-                    Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
-                    Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
-                            backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
-                    for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
-                                && rc.canMove(dir)) {
-                            rc.move(dir);
-                            break;
+                    // if at disadvantage pull back
+                    if (ourTeamStrength < 0) {
+                        Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                        Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
+                                backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
+                        for (Direction dir : dirs) {
+                            if (rc.canMove(dir)) {
+                                rc.move(dir);
+                                break;
+                            }
+                        }
+                    } else {
+                        // if I can back off to a location that I can still attack from, kite back
+                        Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                        Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
+                                backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
+                        for (Direction dir : dirs) {
+                            if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                                    && rc.canMove(dir)) {
+                                rc.move(dir);
+                                break;
+                            }
                         }
                     }
                 }
@@ -133,19 +146,20 @@ public class Launcher extends Unit {
                 follow(masterLauncher.location);
             } else { // I am the master
                 // If enemy reported recently that is closer than the target HQ, fight enemy
-                MapLocation enemyLocation = Comm.getEnemyLoc();
-                if (enemyLocation != null
-                        && rc.getRoundNum() - Comm.getEnemyRound() <= 50
-                        && Comm.getEnemyRound() > clearedUntilRound
-                        && rc.getLocation().distanceSquaredTo(enemyHQLoc) >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
-                    if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
-                        // enemy has been cleared
-                        clearedUntilRound = rc.getRoundNum();
-                    } else {
-                        moveToward(enemyLocation);
-                        indicator += String.format("M2E@%s", enemyLocation);
-                    }
-                } else if (dis >= 9 && friendlyLauncherCnt <= 3) {
+//                MapLocation enemyLocation = Comm.getEnemyLoc();
+//                if (enemyLocation != null
+//                        && rc.getRoundNum() - Comm.getEnemyRound() <= 50
+//                        && Comm.getEnemyRound() > clearedUntilRound
+//                        && rc.getLocation().distanceSquaredTo(enemyHQLoc) >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
+//                    if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
+//                        // enemy has been cleared
+//                        clearedUntilRound = rc.getRoundNum();
+//                    } else {
+//                        moveToward(enemyLocation);
+//                        indicator += String.format("M2E@%s", enemyLocation);
+//                    }
+//                } else
+                if (dis >= 9 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);

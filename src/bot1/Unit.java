@@ -28,9 +28,8 @@ public class Unit extends RobotPlayer {
         }
     }
 
-    static void follow(MapLocation location) throws GameActionException {
+    static void tryMoveDir(Direction dir) throws GameActionException {
         if (rc.isMovementReady()) {
-            Direction dir = rc.getLocation().directionTo(location);
             if (rc.canMove(dir) && rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() == Direction.CENTER) {
                 rc.move(dir);
             } else if (rc.canMove(dir.rotateRight()) && rc.senseMapInfo(rc.getLocation().add(dir.rotateRight())).getCurrentDirection() == Direction.CENTER) {
@@ -41,6 +40,9 @@ public class Unit extends RobotPlayer {
                 randomMove();
             }
         }
+    }
+    static void follow(MapLocation location) throws GameActionException {
+        tryMoveDir(rc.getLocation().directionTo(location));
     }
 
     static int getClosestID(MapLocation[] locations) {
@@ -58,6 +60,11 @@ public class Unit extends RobotPlayer {
         }
         assert dis != Integer.MAX_VALUE;
         return rv;
+    }
+
+    static int getClosestDis(MapLocation[] locations) {
+        int id = getClosestID(locations);
+        return rc.getLocation().distanceSquaredTo(locations[id]);
     }
 
     // new path finding code from Ray
@@ -131,5 +138,19 @@ public class Unit extends RobotPlayer {
 
     static boolean canPass(Direction dir) throws GameActionException {
         return canPass(rc.getLocation().add(dir));
+    }
+
+    static Direction Dxy2dir(int dx, int dy) {
+        if (dx == 0 && dy == 0) return Direction.CENTER;
+        if (dx == 0 && dy == 1) return Direction.NORTH;
+        if (dx == 0 && dy == -1) return Direction.SOUTH;
+        if (dx == 1 && dy == 0) return Direction.EAST;
+        if (dx == 1 && dy == 1) return Direction.NORTHEAST;
+        if (dx == 1 && dy == -1) return Direction.NORTHWEST;
+        if (dx == -1 && dy == 0) return Direction.WEST;
+        if (dx == -1 && dy == 1) return Direction.SOUTHEAST;
+        if (dx == -1 && dy == -1) return Direction.SOUTHWEST;
+        assert false; // shouldn't reach here
+        return null;
     }
 }

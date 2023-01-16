@@ -11,7 +11,10 @@ public class Carrier extends Unit {
     public static final int MINE_AD = 1;
     public static final int MINE_MN = 2;
     public static final int MINE_EL = 3;
-    public static final int SCOUT = 4;
+    public static final int SCOUT_NE = 4;
+    public static final int SCOUT_NW = 5;
+    public static final int SCOUT_SE = 6;
+    public static final int SCOUT_SW = 7;
 
     public static final int MINING = 100;
     public static final int DROPPING_RESOURCE = 101;
@@ -33,110 +36,61 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
+    // scouting vars
+    static int startHQID;
+    static Direction scoutDir;
+
     static void run () throws GameActionException {
         if (turnCount == 0) {
             for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
                 MapLocation location = Comm.getSpawnQLoc(i);
                 if (location != null && location.compareTo(rc.getLocation()) == 0) {
                     purpose = Comm.getSpawnQFlag(i);
+                    startHQID = i;
                     Comm.setSpawnQ(i, -1, -1, 0);
                     Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
+                    break;
                 }
             }
-            if (purpose != MINE_MN && purpose != SCOUT) {
-                purpose = MINE_MN;
-            }
+            assert purpose != AWAIT_CMD;
             if (purpose == MINE_MN) {
-                state = MINING;
                 resourceType = ResourceType.values()[purpose];
                 assert resourceType == ResourceType.MANA;
-                miningHQLoc = Comm.friendlyHQLocations[Comm.closestHQIDToWells[purpose]];
                 miningWellLoc = Comm.closestWells[purpose];
-                assert miningWellLoc != null;
+                if (miningHQLoc == null) {
+                    state = SCOUTING;
+                    miningHQLoc = Comm.friendlyHQLocations[Comm.closestHQIDToWells[purpose]];
+                } else {
+                    state = MINING;
+                }
             } else {
                 state = SCOUTING;
+                if (purpose == SCOUT_NE) scoutDir = Direction.NORTHEAST;
+                else if (purpose == SCOUT_SE) scoutDir = Direction.SOUTHEAST;
+                else if (purpose == SCOUT_SW) scoutDir = Direction.SOUTHWEST;
+                else if (purpose == SCOUT_NW) scoutDir = Direction.NORTHWEST;
             }
         }
 
         if (state == ANCHORING) {
-            indicator += "anchoring";
-            int[] islands = rc.senseNearbyIslands();
-            if (rc.canPlaceAnchor()) {
-                rc.placeAnchor();
-                state = MINING;
-                return;
-            }
-            MapLocation targetLoc = null;
-            int dis = Integer.MAX_VALUE;
-            for (int island : islands) {
-                if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
-                    // we can't place here
-                    continue;
-                }
-                MapLocation locs[] = rc.senseNearbyIslandLocations(island);
-                for (MapLocation loc : locs) {
-                    if (rc.getLocation().distanceSquaredTo(loc) < dis) {
-                        targetLoc = loc;
-                        dis = rc.getLocation().distanceSquaredTo(loc);
-                    }
-                }
-            }
-            if (targetLoc == null) {
-                randomMove();
-            } else {
-                indicator += targetLoc;
-                moveToward(targetLoc);
-            }
+            anchor();
             return; // in state anchoring, ignore everything else (We should have controlled the map anyways)
         }
 
         senseEnemy();
         checkAnchor();
 
-        if (state == RUNAWAY_AND_REPORT) {
-            indicator += "goreport,";
-            int closestHQID = getClosestID(Comm.friendlyHQLocations);
-            if (rc.canWriteSharedArray(0, 0)) {
-                Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
-                Comm.commit_write();
-                state = RUNAWAY;
-            } else {
-                moveToward(Comm.friendlyHQLocations[closestHQID]);
-                if (rc.canWriteSharedArray(0, 0)) {
-                    Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
-                    Comm.commit_write();
-                    state = RUNAWAY;
-                } else {
-                    moveToward(Comm.friendlyHQLocations[closestHQID]);
-                    if (rc.canWriteSharedArray(0, 0)) {
-                        Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
-                        Comm.commit_write();
-                        state = RUNAWAY;
-                    }
-                }
-            }
+        if (state == SCOUTING) {
+            scout();
         }
-        if (state == RUNAWAY) {
-            indicator += "run,";
-            if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
-                state = MINING;
-            } else {
-                Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
-                Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
-                        backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
-                boolean hasMoved = true;
-                while (hasMoved && rc.isMovementReady()) {
-                    hasMoved = false;
-                    for (Direction dir : dirs) {
-                        if (rc.canMove(dir)) {
-                            rc.move(dir);
-                            hasMoved = true;
-                            break;
-                        }
-                    }
-                }
-            }
+        if (state == SCOUTING) {
+            scout();
         }
+
+        if (state == RUNAWAY_AND_REPORT || state == RUNAWAY) {
+            runaway();
+        }
+
 
         if (state == MINING) {
             assert Comm.closestWells[resourceType.resourceID] != null;
@@ -245,6 +199,130 @@ public class Carrier extends Unit {
                 if (rc.canTakeAnchor(loc, Anchor.STANDARD)) {
                     rc.takeAnchor(loc, Anchor.STANDARD);
                     state = ANCHORING;
+                }
+            }
+        }
+    }
+
+    private static void anchor() throws GameActionException {
+        indicator += "anchoring";
+        int[] islands = rc.senseNearbyIslands();
+        if (rc.canPlaceAnchor()) {
+            rc.placeAnchor();
+            state = MINING;
+            return;
+        }
+        MapLocation targetLoc = null;
+        int dis = Integer.MAX_VALUE;
+        for (int island : islands) {
+            if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
+                // we can't place here
+                continue;
+            }
+            MapLocation locs[] = rc.senseNearbyIslandLocations(island);
+            for (MapLocation loc : locs) {
+                if (rc.getLocation().distanceSquaredTo(loc) < dis) {
+                    targetLoc = loc;
+                    dis = rc.getLocation().distanceSquaredTo(loc);
+                }
+            }
+        }
+        if (targetLoc == null) {
+            randomMove();
+        } else {
+            indicator += targetLoc;
+            moveToward(targetLoc);
+        }
+    }
+
+    private static void scout() throws GameActionException {
+        if (Math.sqrt(getClosestDis(Comm.enemyHQLocations)) - 3 <= Math.sqrt(getClosestDis(Comm.friendlyHQLocations))) {
+            indicator += "close2E,endscout,";
+            state = REPORTING_INFO;
+            return;
+        }
+        int closestHQID = getClosestID(Comm.friendlyHQLocations);
+        if (closestHQID != startHQID
+                && Comm.friendlyHQLocations[closestHQID].distanceSquaredTo(rc.getLocation()) <= 64) {
+            indicator += "close2HQ,endscout,";
+            state = REPORTING_INFO;
+            return;
+        }
+        int dx = scoutDir.dx;
+        int dy = scoutDir.dy;
+        for (RobotInfo robot : rc.senseNearbyRobots(-1, myTeam)) {
+            Direction dir = rc.getLocation().directionTo(robot.location);
+            if (robot.type == RobotType.CARRIER && (dir == scoutDir || dir == scoutDir.rotateLeft() || dir == scoutDir.rotateRight())) {
+                indicator += "close2scout,endscout,";
+                state = REPORTING_INFO;
+                return;
+            }
+        }
+        if ((dx > 0 && rc.getMapWidth() - rc.getLocation().x <= 4)
+                || (dx < 0 && rc.getLocation().x <= 3)) {
+            dx = 0;
+        }
+        if ((dy > 0 && rc.getMapWidth() - rc.getLocation().y <= 4)
+                || (dy < 0 && rc.getLocation().y <= 3)) {
+            dy = 0;
+        }
+        scoutDir = Dxy2dir(dx, dy);
+        if (scoutDir == Direction.CENTER) {
+            indicator += "gotcorner,endscout";
+            state = REPORTING_INFO;
+            return;
+        }
+        if (rc.getRoundNum() <= 12) {
+            indicator += "timereached,endscout";
+            state = REPORTING_INFO;
+            return;
+        }
+
+        tryMoveDir(scoutDir);
+    }
+
+    private static void runaway() throws GameActionException {
+        if (state == RUNAWAY_AND_REPORT) {
+            indicator += "goreport,";
+            int closestHQID = getClosestID(Comm.friendlyHQLocations);
+            if (rc.canWriteSharedArray(0, 0)) {
+                Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
+                Comm.commit_write();
+                state = RUNAWAY;
+            } else {
+                moveToward(Comm.friendlyHQLocations[closestHQID]);
+                if (rc.canWriteSharedArray(0, 0)) {
+                    Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
+                    Comm.commit_write();
+                    state = RUNAWAY;
+                } else {
+                    moveToward(Comm.friendlyHQLocations[closestHQID]);
+                    if (rc.canWriteSharedArray(0, 0)) {
+                        Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
+                        Comm.commit_write();
+                        state = RUNAWAY;
+                    }
+                }
+            }
+        }
+        if (state == RUNAWAY) {
+            indicator += "run,";
+            if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
+                state = MINING;
+            } else {
+                Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
+                Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
+                        backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
+                boolean hasMoved = true;
+                while (hasMoved && rc.isMovementReady()) {
+                    hasMoved = false;
+                    for (Direction dir : dirs) {
+                        if (rc.canMove(dir)) {
+                            rc.move(dir);
+                            hasMoved = true;
+                            break;
+                        }
+                    }
                 }
             }
         }

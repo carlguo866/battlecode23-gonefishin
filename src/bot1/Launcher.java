@@ -132,7 +132,7 @@ public class Launcher extends Unit {
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
-        if (rc.getRoundNum() <= 3) {
+        if (rc.getRoundNum() <= 6) {
             // first two rounds just wait for the other two to join and move together
             return;
         }
@@ -145,27 +145,27 @@ public class Launcher extends Unit {
                 indicator += String.format("Following master %d at %s", masterLauncher.getID(), masterLauncher.location);
                 follow(masterLauncher.location);
             } else { // I am the master
-                // If enemy reported recently that is closer than the target HQ, fight enemy
-//                MapLocation enemyLocation = Comm.getEnemyLoc();
-//                if (enemyLocation != null
-//                        && rc.getRoundNum() - Comm.getEnemyRound() <= 50
-//                        && Comm.getEnemyRound() > clearedUntilRound
-//                        && rc.getLocation().distanceSquaredTo(enemyHQLoc) >= rc.getLocation().distanceSquaredTo(enemyLocation)) {
-//                    if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
-//                        // enemy has been cleared
-//                        clearedUntilRound = rc.getRoundNum();
-//                    } else {
-//                        moveToward(enemyLocation);
-//                        indicator += String.format("M2E@%s", enemyLocation);
-//                    }
-//                } else
+                // If enemy reported recently that is close
+                MapLocation enemyLocation = Comm.getEnemyLoc();
+                if (enemyLocation != null
+                        && rc.getRoundNum() - Comm.getEnemyRound() <= 50
+                        && Comm.getEnemyRound() > clearedUntilRound
+                        && rc.getLocation().distanceSquaredTo(enemyLocation) <= 64) {
+                    if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
+                        // enemy has been cleared
+                        clearedUntilRound = rc.getRoundNum();
+                    } else {
+                        moveToward(enemyLocation);
+                        indicator += String.format("M2E@%s", enemyLocation);
+                    }
+                } else
                 if (dis >= 9 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
                     follow(furthestFriendlyLauncher.location);
                 } else {
-                    if (rc.getRoundNum() <= 12) {
+                    if (rc.getRoundNum() <= 26) {
                         // first few turns move toward center of the map
                         moveToward(new MapLocation(rc.getMapWidth()/2, rc.getMapHeight()/2));
                     } else {

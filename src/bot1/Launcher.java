@@ -3,7 +3,6 @@ package bot1;
 import battlecode.common.*;
 
 public class Launcher extends Unit {
-    private static final int MAX_HEALTH = 20;
     private static final int ATTACK_DIS = 16;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
@@ -85,8 +84,8 @@ public class Launcher extends Unit {
                         }
                     }
                 } else {
-                    // if at disadvantage or more healthy launcher in sight, pull back
-                    if (ourTeamStrength < 0 || (rc.getHealth() < MAX_HEALTH && masterLauncher != null && masterLauncher.health > rc.getHealth())) {
+                    // if at disadvantage pull back
+                    if (ourTeamStrength < 0 || rc.getHealth() <= 12) {
                         Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
                         Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
                                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
@@ -111,7 +110,7 @@ public class Launcher extends Unit {
                     }
                 }
             }
-            indicator += String.format("Micro strength %d", ourTeamStrength);
+            indicator += String.format("Micro strength %d target %s", ourTeamStrength, attackTarget.location);
         }
     }
 
@@ -188,10 +187,10 @@ public class Launcher extends Unit {
     }
 
     private static RobotInfo targetPriority(RobotInfo r1, RobotInfo r2) {
-        if (!rc.canActLocation(r2.location))
-            return r1;
         if (r1 == null)
             return r2;
+        if (!rc.canActLocation(r2.location))
+            return r1;
         // Prioritize Launcher
         if (r2.type == RobotType.LAUNCHER && r1.type != RobotType.LAUNCHER)
             return r2;

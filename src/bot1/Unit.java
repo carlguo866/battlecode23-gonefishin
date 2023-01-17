@@ -20,7 +20,6 @@ public class Unit extends RobotPlayer {
             {2, 2}, {2, -2}, {-2, 2}, {-2, -2}
     };
 
-    // TODO path finding
     static void randomMove() throws GameActionException {
         int starting_i = rng.nextInt(directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
@@ -87,17 +86,6 @@ public class Unit extends RobotPlayer {
                     pos = 0;
                 }
                 currentmap[getId(maps[i].getMapLocation())] = maps[i].getCurrentDirection();
-            }
-            if (pos == 0) {
-                moveTowardA(location);
-            }
-            if (pos > 0) {
-                Direction dir = rc.getLocation().directionTo(getLoc(actionArray[pos-1]));
-                if (rc.canMove(dir)) {
-                    rc.move(dir);
-                    pos--;
-                }
-                return ;
             }
             
             if (pathingCnt == 0) {

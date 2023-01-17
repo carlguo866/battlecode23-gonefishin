@@ -1,7 +1,6 @@
 package bot1;
 
 import battlecode.common.*;
-import static bot1.Constants.*;
 
 public class Headquarter extends Unit {
     public static void run() throws GameActionException {

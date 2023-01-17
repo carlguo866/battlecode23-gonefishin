@@ -2,7 +2,6 @@ package bot1;
 
 import battlecode.common.*;
 
-import static bot1.Constants.*;
 
 /**
  * This class contains logic / variable that is shared between all units
@@ -21,9 +20,9 @@ public class Unit extends RobotPlayer {
 
     // TODO path finding
     static void randomMove() throws GameActionException {
-        int starting_i = rng.nextInt(directions.length);
+        int starting_i = Constants.rng.nextInt(Constants.directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
-            Direction dir = directions[i % 8];
+            Direction dir = Constants.directions[i % 8];
             if (rc.canMove(dir) && rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() == Direction.CENTER) rc.move(dir);
         }
     }

@@ -19,7 +19,7 @@ public class Launcher extends Unit {
     static int friendlyLauncherCnt = 1;
     static RobotInfo furthestFriendlyLauncher = null;
 
-    static void sense() {
+    static void sense() throws GameActionException {
         // micro vars
         attackTarget = null;
         closestEnemy = null;
@@ -34,10 +34,7 @@ public class Launcher extends Unit {
                 if (robot.type == RobotType.LAUNCHER) {
                     ourTeamStrength += 2;
                     friendlyLauncherCnt += 1;
-                    if (robot.getID() < rc.getID() &&
-                            (masterLauncher == null  || robot.getID() < masterLauncher.getID())) {
-                        masterLauncher = robot;
-                    }
+                    masterLauncher = getMasterLauncher(masterLauncher, robot);
                     if (furthestFriendlyLauncher == null) {
                         int newDis = robot.getLocation().distanceSquaredTo(rc.getLocation());
                         if (newDis > dis) {
@@ -88,7 +85,7 @@ public class Launcher extends Unit {
                     }
                 } else {
                     // if at disadvantage pull back
-                    if (ourTeamStrength < 0) {
+                    if (ourTeamStrength < 0 || rc.getHealth() <= 12) {
                         Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
                         Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
                                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
@@ -159,7 +156,7 @@ public class Launcher extends Unit {
                         indicator += String.format("M2E@%s", enemyLocation);
                     }
                 } else
-                if (dis >= 9 && friendlyLauncherCnt <= 3) {
+                if (dis >= 4 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
@@ -206,6 +203,17 @@ public class Launcher extends Unit {
         int disR1 = r1.location.distanceSquaredTo(rc.getLocation());
         int disR2 = r2.location.distanceSquaredTo(rc.getLocation());
         return disR1 < disR2? r1 : r2;
+    }
+
+    private static RobotInfo getMasterLauncher(RobotInfo r1, RobotInfo r2) {
+        // self may be master
+        if (r2.health < rc.getHealth() || (r2.health == rc.getHealth() && r2.getID() > rc.getID()))
+            return r1;
+        if (r1 == null)
+            return r2;
+        if (r1.health != r2.health)
+            return r1.health < r2.health? r2 : r1;
+        return r1.getID() < r2.getID()? r1 : r2;
     }
 }
 

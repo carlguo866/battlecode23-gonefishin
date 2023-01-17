@@ -36,6 +36,10 @@ public class Unit extends RobotPlayer {
                 rc.move(dir.rotateRight());
             } else if (rc.canMove(dir.rotateLeft())) {
                 rc.move(dir.rotateLeft());
+            } else if (rc.canMove(dir.rotateRight().rotateRight())) {
+                rc.move(dir.rotateRight().rotateRight());
+            } else if (rc.canMove(dir.rotateLeft().rotateLeft())) {
+                rc.move(dir.rotateLeft().rotateLeft());
             } else {
                 randomMove();
             }

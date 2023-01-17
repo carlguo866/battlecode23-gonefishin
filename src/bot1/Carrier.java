@@ -102,7 +102,11 @@ public class Carrier extends Unit {
         }
 
         if (state == MINING) {
-            if (rc.canCollectResource(miningWellLoc, -1)) {
+            if (shouldStopMining()) {
+                int hqid = getClosestID(Comm.friendlyHQLocations);
+                miningHQLoc = Comm.friendlyHQLocations[hqid];
+                state = DROPPING_RESOURCE;
+            } else if (rc.canCollectResource(miningWellLoc, -1)) {
                 rc.collectResource(miningWellLoc, -1);
                 indicator += "collecting,";
                 // moving pattern to allow others to join
@@ -120,11 +124,7 @@ public class Carrier extends Unit {
                         if (rc.canMove(dir)) rc.move(dir);
                     }
                 }
-            } else if (shouldStopMining()) {
-                int hqid = getClosestID(Comm.friendlyHQLocations);
-                miningHQLoc = Comm.friendlyHQLocations[hqid];
-                state = DROPPING_RESOURCE;
-            } else {
+            } else { // moving toward mine
                 // switch mine randomly if original too congested
                 if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
                     for (int i = 0; i < 10; i++) {

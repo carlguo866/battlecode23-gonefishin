@@ -1,4 +1,4 @@
-package pathfinder;
+package bot1;
 
 public class BinaryHeap {
      

@@ -1,7 +1,6 @@
-package bot1;
+package submit10;
 
 import battlecode.common.*;
-import scala.collection.immutable.Stream;
 
 import java.util.Random;
 

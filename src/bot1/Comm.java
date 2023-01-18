@@ -22,23 +22,21 @@ import battlecode.common.*;
  * 12 bit: coord
  * 4 bit flag
  *
- * enemy report starting bit 336
+ * enemy report starting bit 336 - 359
  * each of:
  * 12 bit: coord
  * 12 bits: last seen round number, could be % 64 later
  *
  * TODO
- * Anchor stuff bit 248
- * 4 bit signifying if each HQ has anchor
- *
  * 35 islands
- * each 12(6) bits for pos, 4 flags for if conquered
+ * each 12(6) bits for pos, 1 bit for if index confirmed, 2 bit for if conquered
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
-    private static final int ENEMY_BIT = 272;
+    private static final int ENEMY_BIT = 336;
+    private static final int ISLAND_BIT = 360;
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -107,8 +105,8 @@ public class Comm extends RobotPlayer {
             friendlyHQLocations[i] = int2loc(readBits(12 * i, 12));
             if (friendlyHQLocations[i] != null) {
                 // assume the map is rotationally symmetric, FIXME
-                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - friendlyHQLocations[i].x,
-                        rc.getMapHeight() - friendlyHQLocations[i].y);
+                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - friendlyHQLocations[i].x - 1,
+                        rc.getMapHeight() - friendlyHQLocations[i].y - 1);
                 numHQ++;
             }
         }
@@ -188,6 +186,21 @@ public class Comm extends RobotPlayer {
 
     public static int getEnemyRound() {
         return readBits(ENEMY_BIT + 12, 12);
+    }
+
+    // island storage
+    public static void reportIsland(MapLocation loc, int index) {
+        if (getIslandPos(index) != null)
+            return;
+    }
+
+    // return 0 if not found
+    public static int getNextFreeIslandIndex() {
+        return 0;
+    }
+
+    public static MapLocation getIslandPos(int index) {
+        return null;
     }
 
     // helper funcs

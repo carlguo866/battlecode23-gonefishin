@@ -137,7 +137,7 @@ public class Unit extends RobotPlayer {
     }
 
     static boolean canPass(MapLocation loc) throws GameActionException {
-        if (!rc.senseMapInfo(loc).isPassable() || rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
+        if (!rc.onTheMap(loc) || !rc.senseMapInfo(loc).isPassable() || rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
             return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null && robot.type == RobotType.HEADQUARTERS)

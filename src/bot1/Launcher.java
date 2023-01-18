@@ -110,7 +110,7 @@ public class Launcher extends Unit {
                     }
                 }
             }
-            indicator += String.format("Micro strength %d target %s", ourTeamStrength, attackTarget.location);
+            indicator += String.format("Micro strength %d target", ourTeamStrength);
         }
     }
 
@@ -187,10 +187,10 @@ public class Launcher extends Unit {
     }
 
     private static RobotInfo targetPriority(RobotInfo r1, RobotInfo r2) {
-        if (r1 == null)
-            return r2;
         if (!rc.canActLocation(r2.location))
             return r1;
+        if (r1 == null)
+            return r2;
         // Prioritize Launcher
         if (r2.type == RobotType.LAUNCHER && r1.type != RobotType.LAUNCHER)
             return r2;

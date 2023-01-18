@@ -2,6 +2,8 @@ package bot1;
 
 import battlecode.common.*;
 
+import java.util.Random;
+
 public class Carrier extends Unit {
     private static final int MAX_WEIGHT = 40; // tunable later
     private static final int ATTACK_DIS = 9;
@@ -37,6 +39,8 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
+    private static Random rng;
+
     // scouting vars
     static int startHQID;
     static Direction scoutDir;
@@ -45,6 +49,7 @@ public class Carrier extends Unit {
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
+            rng = new Random(rc.getID());
             for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
                 MapLocation location = Comm.getSpawnQLoc(i);
                 if (location != null && location.equals(rc.getLocation())) {
@@ -409,7 +414,7 @@ public class Carrier extends Unit {
             miningResourceType = ResourceType.ADAMANTIUM;
         } else {
             // Mine AD with 1/3 prob if both mines available
-            miningResourceType = Constants.rng.nextInt(3) == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
+            miningResourceType = rng.nextInt(3) == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
         }
         int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
         miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];

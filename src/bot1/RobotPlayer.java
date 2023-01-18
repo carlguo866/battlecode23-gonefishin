@@ -18,6 +18,7 @@ public strictfp class RobotPlayer {
     static Team oppTeam;
 
     public static String indicator;
+    public static int startRound;
 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
@@ -37,6 +38,7 @@ public strictfp class RobotPlayer {
 
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode.
             try {
+                startRound = rc.getRoundNum();
                 indicator = "";
                 Comm.turn_starts();
                 switch (rc.getType()) {
@@ -65,8 +67,11 @@ public strictfp class RobotPlayer {
             } finally {
                 // Signify we've done everything we want to do, thereby ending our turn.
                 // This will make our code wait until the next turn, and then perform this loop again.
-                Clock.yield();
                 turnCount += 1;
+                if (startRound != rc.getRoundNum()) {
+                    System.out.printf("overran turn from %d to %d", startRound, rc.getRoundNum());
+                }
+                Clock.yield();
             }
         }
 

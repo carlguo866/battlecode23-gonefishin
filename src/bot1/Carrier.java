@@ -305,11 +305,11 @@ public class Carrier extends Unit {
             }
         }
         // no need to go too close to edge in one direction
-        if ((dx > 0 && rc.getMapWidth() - rc.getLocation().x <= 4)
+        if ((dx > 0 && mapWidth - rc.getLocation().x <= 4)
                 || (dx < 0 && rc.getLocation().x <= 3)) {
             dx = 0;
         }
-        if ((dy > 0 && rc.getMapHeight() - rc.getLocation().y <= 4)
+        if ((dy > 0 && mapHeight - rc.getLocation().y <= 4)
                 || (dy < 0 && rc.getLocation().y <= 3)) {
             dy = 0;
         }

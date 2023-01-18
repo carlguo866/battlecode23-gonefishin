@@ -155,7 +155,7 @@ public class Launcher extends Unit {
                 } else {
                     if (rc.getRoundNum() <= 26) {
                         // first few turns move toward center of the map
-                        moveToward(new MapLocation(rc.getMapWidth()/2, rc.getMapHeight()/2));
+                        moveToward(new MapLocation(mapWidth/2, mapHeight/2));
                     } else {
                         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
                         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {

@@ -111,8 +111,8 @@ public class Comm extends RobotPlayer {
             friendlyHQLocations[i] = int2loc(readBits(12 * i, 12));
             if (friendlyHQLocations[i] != null) {
                 // assume the map is rotationally symmetric, FIXME
-                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - friendlyHQLocations[i].x - 1,
-                        rc.getMapHeight() - friendlyHQLocations[i].y - 1);
+                enemyHQLocations[i] = new MapLocation(mapWidth - friendlyHQLocations[i].x - 1,
+                        mapHeight - friendlyHQLocations[i].y - 1);
                 numHQ++;
             }
         }

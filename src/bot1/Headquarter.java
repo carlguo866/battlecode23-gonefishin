@@ -29,7 +29,7 @@ public class Headquarter extends Unit {
         }
 //        indicator += String.format("AD %s %s %sMN %s %s %s", Comm.closestWells[1][0],Comm.closestWells[1][1],Comm.closestWells[1][2], Comm.closestWells[2][0], Comm.closestWells[2][1], Comm.closestWells[2][2]);
 
-        if (rc.getRobotCount() >= rc.getMapWidth() * rc.getMapHeight() * 0.15) {
+        if (rc.getRobotCount() >= mapWidth * mapHeight * 0.15) {
             // this means we have basically won already, build anchor
             if (rc.canBuildAnchor(Anchor.STANDARD)) {
                 rc.buildAnchor(Anchor.STANDARD);
@@ -38,7 +38,7 @@ public class Headquarter extends Unit {
         } else {
             // spawn Launchers
             if (rc.getResourceAmount(ResourceType.MANA) >= Constants.LAUNCHER_COST_MN) { // can build launcher
-                Direction dirToCenter = rc.getLocation().directionTo(new MapLocation(rc.getMapWidth() / 2, rc.getMapHeight() / 2));
+                Direction dirToCenter = rc.getLocation().directionTo(new MapLocation(mapWidth / 2, mapHeight / 2));
                 MapLocation spawnLocation = rc.getLocation().add(dirToCenter).add(dirToCenter);
                 for (int[] dir : BFS25) {
                     MapLocation location = new MapLocation(spawnLocation.x + dir[0], spawnLocation.y + dir[1]);

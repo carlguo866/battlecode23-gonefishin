@@ -14,6 +14,8 @@ public strictfp class RobotPlayer {
     static RobotController rc;
     static int turnCount;
 
+    static int mapWidth, mapHeight;
+
     static Team myTeam;
     static Team oppTeam;
 
@@ -32,6 +34,8 @@ public strictfp class RobotPlayer {
         RobotPlayer.rc = rc;
         myTeam = rc.getTeam();
         oppTeam = rc.getTeam().opponent();
+        mapWidth = rc.getMapWidth();
+        mapHeight = rc.getMapHeight();
         turnCount = 0;
 
         while (true) {

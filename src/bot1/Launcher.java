@@ -3,7 +3,6 @@ package bot1;
 import battlecode.common.*;
 
 public class Launcher extends Unit {
-    private static final int ATTACK_DIS = 16;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 
@@ -75,7 +74,7 @@ public class Launcher extends Unit {
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
                     for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.LAUNCHER_ATTACK_DIS
                                 && rc.canMove(dir)) {
                             rc.move(dir);
                             if (rc.canAttack(closestEnemy.location)) {
@@ -101,7 +100,7 @@ public class Launcher extends Unit {
                         Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
                                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
                         for (Direction dir : dirs) {
-                            if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                            if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.LAUNCHER_ATTACK_DIS
                                     && rc.canMove(dir)) {
                                 rc.move(dir);
                                 break;

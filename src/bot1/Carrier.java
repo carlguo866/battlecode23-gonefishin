@@ -1,13 +1,11 @@
 package bot1;
 
 import battlecode.common.*;
+import scala.collection.immutable.Stream;
 
 import java.util.Random;
 
 public class Carrier extends Unit {
-    private static final int MAX_WEIGHT = 40; // tunable later
-    private static final int ATTACK_DIS = 9;
-
     public static final int AWAIT_CMD = 0;
     // for mining purposes, int value equal ResourceType
     public static final int GO_MINE = 1;
@@ -176,7 +174,7 @@ public class Carrier extends Unit {
     }
 
     private static boolean shouldStopMining() {
-        if (rc.getWeight() >= MAX_WEIGHT)
+        if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY)
             return true;
         // early game optim, get launcher out asap
         if (rc.getRoundNum() <= 100 && (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 25 || rc.getResourceAmount(ResourceType.MANA) >= 30))
@@ -209,7 +207,7 @@ public class Carrier extends Unit {
                     Direction[] dirs = {forwardDir.rotateRight().rotateRight(), forwardDir.rotateLeft().rotateLeft(),
                             forwardDir.rotateLeft(), forwardDir.rotateRight(), forwardDir};
                     for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.CARRIER_ATTACK_DIS
                                 && rc.canMove(dir)) {
                             rc.move(dir);
                             assert rc.canAttack(closestEnemy.location);

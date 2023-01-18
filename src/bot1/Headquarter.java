@@ -26,6 +26,7 @@ public class Headquarter extends Unit {
                         break;
                     }
                 }
+            return; // TODO fix this to allow multiple spawn per turn
         }
 //        indicator += String.format("AD %s %s %sMN %s %s %s", Comm.closestWells[1][0],Comm.closestWells[1][1],Comm.closestWells[1][2], Comm.closestWells[2][0], Comm.closestWells[2][1], Comm.closestWells[2][2]);
 
@@ -37,7 +38,7 @@ public class Headquarter extends Unit {
             indicator += "anchoring";
         } else {
             // spawn Launchers
-            if (rc.getResourceAmount(ResourceType.MANA) >= 60) { // can build launcher
+            if (rc.getResourceAmount(ResourceType.MANA) >= Constants.LAUNCHER_COST_MN) { // can build launcher
                 Direction dirToCenter = rc.getLocation().directionTo(new MapLocation(rc.getMapWidth() / 2, rc.getMapHeight() / 2));
                 MapLocation spawnLocation = rc.getLocation().add(dirToCenter).add(dirToCenter);
                 for (int[] dir : BFS25) {
@@ -51,7 +52,7 @@ public class Headquarter extends Unit {
                 }
             }
             // spawn carrier if possible
-            if (turnCount >= 1 && rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 50) {
+            if (turnCount >= 1 && rc.getResourceAmount(ResourceType.ADAMANTIUM) >= Constants.CARRIER_COST_AD) {
                 for (int[] dir : BFS25) {
                     MapLocation location = new MapLocation(rc.getLocation().x + dir[0], rc.getLocation().y + dir[1]);
                     if(rc.canBuildRobot(RobotType.CARRIER, location)

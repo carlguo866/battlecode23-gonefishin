@@ -121,13 +121,25 @@ public class Unit extends RobotPlayer {
                         rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1])).getCurrentDirection() == Direction.CENTER)) {
                     pathingCnt--;
                 }
-                while (pathingCnt > 0 &&
-                        (!rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).isPassable() ||
-                        rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).getCurrentDirection() != Direction.CENTER)) {
-                    prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();;
-                    pathingCnt++;
+                Direction moveDir;
+                if (lastturn == 0) {
+                    while (pathingCnt > 0 &&
+                            (!rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).isPassable() ||
+                            rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateLeft())).getCurrentDirection() != Direction.CENTER)) {
+                        prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();
+                        pathingCnt++;
+                    }
+                    moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
                 }
-                Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
+                else {
+                    while (pathingCnt > 0 &&
+                            (!rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateRight())).isPassable() ||
+                            rc.senseMapInfo(rc.getLocation().add(prv[pathingCnt - 1].rotateRight())).getCurrentDirection() != Direction.CENTER)) {
+                        prv[pathingCnt] = prv[pathingCnt - 1].rotateRight();
+                        pathingCnt++;
+                    }
+                    moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateRight();
+                }
                 if (rc.canMove(moveDir) && rc.senseMapInfo(rc.getLocation().add(moveDir)).getCurrentDirection() == Direction.CENTER) {
                     rc.move(moveDir);
                 } else {

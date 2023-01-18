@@ -2,7 +2,7 @@ package bot1;
 
 import battlecode.common.*;
 import static bot1.Constants.*;
-import pathfinder.BinaryHeap;
+import bot1.BinaryHeap;
 
 
 /**

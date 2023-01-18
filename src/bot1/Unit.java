@@ -123,6 +123,10 @@ public class Unit extends RobotPlayer {
                 while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateLeft())) {
                     prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();;
                     pathingCnt++;
+                    if (pathingCnt == PRV_LENGTH) {
+                        pathingCnt = 0;
+                        return;
+                    }
                 }
                 Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
                 if (rc.canMove(moveDir)) {

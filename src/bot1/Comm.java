@@ -255,61 +255,44 @@ public class Comm extends RobotPlayer {
     public static final int SYM_VERTIAL = 1;
     public static final int SYM_HORIZONTAL = 2;
 
-    private static final int MAX_MAP_SIZE = 60;
-    public static Tile[][] mapSeen = new Tile[MAX_MAP_SIZE][MAX_MAP_SIZE];
     public static int symmetry;
     public static boolean isSymmetryConfirmed;
+    public static boolean needSymmetryReport;
     public static boolean[] isSymEliminated = new boolean[3];
 
-    public static class Tile {
-        public int wellResourceType;
-        public Direction currentDirection;
-        public boolean isPassible;
-        public boolean hasCloud;
-        public Tile(int _wellResourceType, Direction _currentDirection, boolean _isPassible, boolean _hasCloud) {
-            wellResourceType = _wellResourceType;
-            currentDirection = _currentDirection;
-            isPassible = _isPassible;
-            hasCloud = _hasCloud;
+    public static void eliminateSym(int sym) throws GameActionException {
+        isSymEliminated[sym] = true;
+        if (rc.canWriteSharedArray(0, 0)) {
+            writeBits(SYM_BIT + sym, 1, 1);
+            commit_write();
+        } else {
+            needSymmetryReport = true;
         }
-
-        public boolean isSym(Tile tile, int sym) {
-            return (wellResourceType == tile.wellResourceType
-                    && hasCloud == tile.hasCloud
-                    && isPassible == tile.isPassible
-                    && currentDirection.getDeltaX() == tile.currentDirection.getDeltaX() * ((sym & 1) == 0? -1 : 1)
-                    && currentDirection.getDeltaY() == tile.currentDirection.getDeltaY() * ((sym & 2) == 0? -1 : 1));
-        }
-    }
-
-    public static void reportTile(MapInfo info) throws GameActionException {
-        MapLocation loc = info.getMapLocation();
-        WellInfo well = rc.senseWell(loc);
-        Tile tile = new Tile(well == null? 0 : well.getResourceType().resourceID,
-                info.getCurrentDirection(), info.isPassable(), info.hasCloud());
-        for (int sym = 3; --sym >= 0;) {
-            if (isSymEliminated[sym])
-                continue;
-            Tile symTile = mapSeen[(sym & 1) == 0? mapWidth - loc.x - 1 : loc.x]
-                    [(sym & 2) == 0? mapHeight - loc.y - 1 : loc.y];
-            if (symTile != null && !tile.isSym(symTile, sym)) {
-                isSymEliminated[sym] = true;
-                writeBits(SYM_BIT + sym, 1, 1);
-                System.out.printf("eliminated sym %d from %s\n", sym, loc);
-                guessSym();
-            }
-        }
-        mapSeen[loc.x][loc.y] = tile;
+        guessSym();
     }
 
     public static void updateSym() {
         int bits = readBits(SYM_BIT, 3);
+        needSymmetryReport = false;
         for (int sym = 3; --sym >= 0; ) {
             if (!isSymEliminated[sym] && (bits & (1 << (2 - sym))) > 0) {
                 isSymEliminated[sym] = true;
+            } else if (isSymEliminated[sym] && (bits & (1 << (2 - sym))) == 0) {
+                needSymmetryReport = true;
             }
         }
         guessSym();
+    }
+
+    public static void reportSym() throws GameActionException {
+        if (!needSymmetryReport)
+            return;
+        int bits = readBits(SYM_BIT, 3);
+        for (int sym = 3; --sym >= 0; ) {
+            if (isSymEliminated[sym] && (bits & (1 << (2 - sym))) == 0) {
+                writeBits(SYM_BIT + sym, 1, 1);
+            }
+        }
     }
 
     public static void guessSym() {

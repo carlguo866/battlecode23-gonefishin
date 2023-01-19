@@ -147,7 +147,7 @@ public class Launcher extends Unit {
                         indicator += String.format("M2E@%s", enemyLocation);
                     }
                 } else
-                if (dis >= 4 && friendlyLauncherCnt <= 3) {
+                if (dis >= 9 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
@@ -167,6 +167,7 @@ public class Launcher extends Unit {
                                 }
                             }
                         }
+                        enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
                         indicator += String.format("M2EHQ@%s", enemyHQLoc);
                         moveToward(enemyHQLoc);
                     }

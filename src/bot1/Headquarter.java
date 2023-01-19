@@ -10,16 +10,11 @@ public class Headquarter extends Unit {
             for (WellInfo well : rc.senseNearbyWells()) {
                 Comm.reportWells(well);
             }
-
-            int startBytecode = Clock.getBytecodeNum();
-            for (MapInfo info : rc.senseNearbyMapInfos()) {
-                Comm.reportTile(info);
-            }
-            int endBytecode = Clock.getBytecodeNum();
-            System.out.printf("report bytecode %d:%d to %d:%d\n", startRound, startBytecode, rc.getRoundNum(), endBytecode);
         }
 
         if (turnCount <= 3) {
+            MapRecorder.record(4000);
+
             Direction[] SPAWN_DIR = {Direction.SOUTHEAST, Direction.SOUTHWEST, Direction.NORTHEAST, Direction.NORTHWEST};
             int[] PURPURSES = {Carrier.SCOUT_SE, Carrier.SCOUT_SW, Carrier.SCOUT_NE, Carrier.SCOUT_NW};
             MapLocation spawnLocation = rc.getLocation().add(SPAWN_DIR[turnCount]).add(SPAWN_DIR[turnCount]);

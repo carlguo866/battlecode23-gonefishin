@@ -67,6 +67,7 @@ public class Carrier extends Unit {
         }
 
         if (state == SCOUTING) {
+            MapRecorder.record(4000);
             scoutSense();
         }
         senseEnemy();
@@ -266,7 +267,7 @@ public class Carrier extends Unit {
         }
     }
 
-    private static void scoutSense() {
+    private static void scoutSense() throws GameActionException {
         for (WellInfo well : rc.senseNearbyWells()) {
             boolean seenWell = false;
             for (int i = 0; i < wellSeenCnt; i++) {
@@ -330,7 +331,7 @@ public class Carrier extends Unit {
     }
 
     private static boolean isNeedReport() {
-        return lastEnemyRound > Comm.getEnemyRound() || wellReportCnt < wellSeenCnt;
+        return lastEnemyRound > Comm.getEnemyRound() || wellReportCnt < wellSeenCnt || Comm.needSymmetryReport;
     }
 
     private static void report() throws GameActionException {
@@ -350,6 +351,7 @@ public class Carrier extends Unit {
                 }
                 while(wellReportCnt < wellSeenCnt)
                     Comm.reportWells(wellsToReport[wellReportCnt++]);
+                Comm.reportSym();
                 Comm.commit_write();
             } else { // still can't write, wait for more moves and don't transition
                 return;

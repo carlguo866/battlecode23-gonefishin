@@ -51,6 +51,7 @@ public class Carrier extends Unit {
                 findMineTarget();
             } else {
                 state = SCOUTING;
+                startHQID = getClosestID(Comm.friendlyHQLocations);
                 if (purpose == SCOUT_NE) scoutDir = Direction.NORTHEAST;
                 else if (purpose == SCOUT_SE) scoutDir = Direction.SOUTHEAST;
                 else if (purpose == SCOUT_SW) scoutDir = Direction.SOUTHWEST;

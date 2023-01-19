@@ -3,12 +3,13 @@ package bot1;
 import battlecode.common.*;
 
 public class MapRecorder extends RobotPlayer {
+    // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting
     // perform bit hack to reduce init cost
-    public static final int SEEN_BIT = 1 << 10;
-    public static final int CLOUD_BIT = 1 << 11;
-    public static final int WELL_BIT = 1 << 12;
-    public static final int PASSIABLE_BIT = 1 << 13;
-    public static final int ISLAND_BIT = 1 << 14;
+    public static final int SEEN_BIT = 1 << 4;
+    public static final int CLOUD_BIT = 1 << 5;
+    public static final int WELL_BIT = 1 << 6;
+    public static final int PASSIABLE_BIT = 1 << 7;
+    public static final int ISLAND_BIT = 1 << 8;
     // current use & 0xF for ordinal
 
     public static int[][] vals = new int[mapWidth][mapHeight];

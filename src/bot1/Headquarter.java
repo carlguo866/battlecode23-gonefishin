@@ -10,6 +10,13 @@ public class Headquarter extends Unit {
             for (WellInfo well : rc.senseNearbyWells()) {
                 Comm.reportWells(well);
             }
+
+            int startBytecode = Clock.getBytecodeNum();
+            for (MapInfo info : rc.senseNearbyMapInfos()) {
+                Comm.reportTile(info);
+            }
+            int endBytecode = Clock.getBytecodeNum();
+            System.out.printf("report bytecode %d:%d to %d:%d\n", startRound, startBytecode, rc.getRoundNum(), endBytecode);
         }
 
         if (turnCount <= 3) {

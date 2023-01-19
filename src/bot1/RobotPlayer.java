@@ -73,7 +73,7 @@ public strictfp class RobotPlayer {
                 // This will make our code wait until the next turn, and then perform this loop again.
                 turnCount += 1;
                 if (startRound != rc.getRoundNum()) {
-                    System.out.printf("overran turn from %d to %d", startRound, rc.getRoundNum());
+                    System.out.printf("overran turn from %d to %d\n", startRound, rc.getRoundNum());
                 }
                 Clock.yield();
             }

@@ -12,7 +12,8 @@ import java.awt.*;
  *
  * Shared array
  * 0-47: 4*2 6bits int specifying the coord of friendly HQs
- * 48-49: 2 bit indicating symmetry of map (0 unknown, 1 rotational, 2 vertial, 3 horizontal)
+ * 48-50: 3 bit whether symmetries of the map have been eliminated:
+ * [ROTATIONAL, VERTIAL, HORIZONTAL]
  *
  * well info 96-203 bits
  * wells info starting bit 96 of 3 types, each 36 bits total 108 bits
@@ -36,10 +37,12 @@ import java.awt.*;
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
+    private static final int SYM_BIT = 48;
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 336;
     private static final int ISLAND_BIT = 360;
+
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -58,10 +61,14 @@ public class Comm extends RobotPlayer {
 
     public static void turn_starts() throws GameActionException {
         // TODO only update constant like variable (eg no spawn Q)
+        boolean needSymUpdate = false;
         for (int i = 0; i < ARRAY_LENGTH; i++) {
             if (rc.readSharedArray(i) != buffered_share_array[i]) {
                 if (i >= 6 && i <= 13) {
                     needWellsUpdate = true;
+                }
+                if (i == 3) {
+                    needSymUpdate = true;
                 }
                 buffered_share_array[i] = rc.readSharedArray(i);
             }
@@ -70,6 +77,10 @@ public class Comm extends RobotPlayer {
         if ((turnCount <= 1 && rc.getType() == RobotType.HEADQUARTERS)
                 || (turnCount == 0 && rc.getType() != RobotType.HEADQUARTERS)) {
             updateHQLocations();
+        }
+
+        if (needSymUpdate || turnCount == 0) {
+            updateSym();
         }
 
         if (needWellsUpdate &&
@@ -105,15 +116,34 @@ public class Comm extends RobotPlayer {
         assert false;
     }
 
-    private static void updateHQLocations() {
+    private static void updateHQLocations() throws GameActionException {
         numHQ = 0;
         for (int i = 0; i < 4; i++) {
             friendlyHQLocations[i] = int2loc(readBits(12 * i, 12));
             if (friendlyHQLocations[i] != null) {
-                // assume the map is rotationally symmetric, FIXME
-                enemyHQLocations[i] = new MapLocation(mapWidth - friendlyHQLocations[i].x - 1,
-                        mapHeight - friendlyHQLocations[i].y - 1);
                 numHQ++;
+            } else {
+                break;
+            }
+        }
+        if (turnCount == 1 && rc.getType() == RobotType.HEADQUARTERS && !isSymmetryConfirmed) {
+            for (int i = numHQ; --i >= 0;) {
+                for (int sym = 3; --sym >= 0;) {
+                    if (isSymEliminated[sym])
+                        continue;
+                    MapLocation loc = friendlyHQLocations[i];
+                    MapLocation symLoc = new MapLocation(
+                            (sym & 1) == 0? mapWidth - loc.x - 1 : loc.x,
+                            (sym & 2) == 0? mapHeight - loc.y - 1 : loc.y);
+                    if (!rc.canSenseLocation(symLoc)) continue;
+                    RobotInfo robot = rc.senseRobotAtLocation(symLoc);
+                    if (robot == null || robot.type != RobotType.HEADQUARTERS || robot.team != oppTeam) {
+                        isSymEliminated[sym] = true;
+                        writeBits(SYM_BIT + sym, 1, 1);
+                        System.out.printf("eliminate sym %d from HQ at %s\n", sym, loc);
+                        guessSym();
+                    }
+                }
             }
         }
     }
@@ -217,6 +247,92 @@ public class Comm extends RobotPlayer {
 
     public static MapLocation getIslandPos(int index) {
         return null;
+    }
+
+    // symmetry checker
+    // bit 0-2: whether sym is eliminated
+    public static final int SYM_ROTATIONAL = 0;
+    public static final int SYM_VERTIAL = 1;
+    public static final int SYM_HORIZONTAL = 2;
+
+    private static final int MAX_MAP_SIZE = 60;
+    public static Tile[][] mapSeen = new Tile[MAX_MAP_SIZE][MAX_MAP_SIZE];
+    public static int symmetry;
+    public static boolean isSymmetryConfirmed;
+    public static boolean[] isSymEliminated = new boolean[3];
+
+    public static class Tile {
+        public int wellResourceType;
+        public Direction currentDirection;
+        public boolean isPassible;
+        public boolean hasCloud;
+        public Tile(int _wellResourceType, Direction _currentDirection, boolean _isPassible, boolean _hasCloud) {
+            wellResourceType = _wellResourceType;
+            currentDirection = _currentDirection;
+            isPassible = _isPassible;
+            hasCloud = _hasCloud;
+        }
+
+        public boolean isSym(Tile tile, int sym) {
+            return (wellResourceType == tile.wellResourceType
+                    && hasCloud == tile.hasCloud
+                    && isPassible == tile.isPassible
+                    && currentDirection.getDeltaX() == tile.currentDirection.getDeltaX() * ((sym & 1) == 0? -1 : 1)
+                    && currentDirection.getDeltaY() == tile.currentDirection.getDeltaY() * ((sym & 2) == 0? -1 : 1));
+        }
+    }
+
+    public static void reportTile(MapInfo info) throws GameActionException {
+        MapLocation loc = info.getMapLocation();
+        WellInfo well = rc.senseWell(loc);
+        Tile tile = new Tile(well == null? 0 : well.getResourceType().resourceID,
+                info.getCurrentDirection(), info.isPassable(), info.hasCloud());
+        for (int sym = 3; --sym >= 0;) {
+            if (isSymEliminated[sym])
+                continue;
+            Tile symTile = mapSeen[(sym & 1) == 0? mapWidth - loc.x - 1 : loc.x]
+                    [(sym & 2) == 0? mapHeight - loc.y - 1 : loc.y];
+            if (symTile != null && !tile.isSym(symTile, sym)) {
+                isSymEliminated[sym] = true;
+                writeBits(SYM_BIT + sym, 1, 1);
+                System.out.printf("eliminated sym %d from %s\n", sym, loc);
+                guessSym();
+            }
+        }
+        mapSeen[loc.x][loc.y] = tile;
+    }
+
+    public static void updateSym() {
+        int bits = readBits(SYM_BIT, 3);
+        for (int sym = 3; --sym >= 0; ) {
+            if (!isSymEliminated[sym] && (bits & (1 << (2 - sym))) > 0) {
+                isSymEliminated[sym] = true;
+            }
+        }
+        guessSym();
+    }
+
+    public static void guessSym() {
+        int numPossible = 0;
+        for (int sym = 3; --sym >=0; ) {
+            if (!isSymEliminated[sym]) {
+                numPossible++;
+                symmetry = sym;
+            }
+        }
+        assert numPossible > 0;
+        if (numPossible == 1) {
+            isSymmetryConfirmed = true;
+        } else {
+            isSymmetryConfirmed = false;
+        }
+        // update enemy HQ loc
+        for (int i = numHQ; --i >= 0;) {
+            MapLocation loc = friendlyHQLocations[i];
+            enemyHQLocations[i] = new MapLocation(
+                    (symmetry & 1) == 0? mapWidth - loc.x - 1 : loc.x,
+                    (symmetry & 2) == 0? mapHeight - loc.y - 1 : loc.y);
+        }
     }
 
     // helper funcs

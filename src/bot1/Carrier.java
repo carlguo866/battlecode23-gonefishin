@@ -389,19 +389,24 @@ public class Carrier extends Unit {
     private static void dropResource() throws GameActionException {
         int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
         int mn = rc.getResourceAmount(ResourceType.MANA);
-        if (rc.getWeight() == 0) {
-            congestedMines.clear();
-            state = MINING;
-            tryFindMine();
-        } else if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
-            rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
-            indicator += "drop";
-        } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
-            rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
-            indicator += "drop";
-        } else {
+        if (!rc.getLocation().isAdjacentTo(miningHQLoc)) {
             moveToward(miningHQLoc);
             indicator += "2drop";
+        }
+        if (rc.getLocation().isAdjacentTo(miningHQLoc)) {
+            if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
+                rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
+                indicator += "drop";
+            } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
+                rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
+                indicator += "drop";
+            }
+            if (rc.getWeight() == 0) {
+                congestedMines.clear();
+                state = MINING;
+                tryFindMine();
+                mine();
+            }
         }
     }
 

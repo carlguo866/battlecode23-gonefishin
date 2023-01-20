@@ -4,6 +4,7 @@ import battlecode.common.*;
 
 import java.util.Random;
 import bot1.util.FastIterableLocSet;
+import bot1.util.FastLocIntMap;
 
 public class Carrier extends Unit {
     // purposes
@@ -32,7 +33,8 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
-    public static FastIterableLocSet congestedMines = new FastIterableLocSet(20);
+    public static FastIterableLocSet congestedMines = new FastIterableLocSet(400);
+    public static FastLocIntMap lastEnemyOnMine = new FastLocIntMap();
     private static Random rng;
 
     // scouting vars
@@ -165,6 +167,10 @@ public class Carrier extends Unit {
                     }
                 }
             }
+            if (state == MINING || state == DROPPING_RESOURCE) {
+                lastEnemyOnMine.remove(miningWellLoc);
+                lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
+            }
             state = REPORT_AND_RUNAWAY;
         }
     }
@@ -286,7 +292,7 @@ public class Carrier extends Unit {
     }
 
     private static boolean isNeedReport() {
-        return lastEnemyRound > Comm.getEnemyRound() || wellReportCnt < wellSeenCnt || Comm.needSymmetryReport;
+        return lastEnemyRound > (Comm.getEnemyRound() + 2) || wellReportCnt < wellSeenCnt || Comm.needSymmetryReport;
     }
 
     private static void report() throws GameActionException {
@@ -318,7 +324,11 @@ public class Carrier extends Unit {
         }
         // state transitions
         indicator += "NORP,";
-        resumeWork();
+        if (state == REPORT_AND_RUNAWAY) {
+            state = RUNAWAY;
+        } else { // reporting info
+            resumeWork();
+        }
     }
 
     private static void runaway() throws GameActionException {
@@ -439,19 +449,46 @@ public class Carrier extends Unit {
             scoutStartRound = rc.getRoundNum();
         } else {
             miningWellLoc = null;
-            for (MapLocation loc : Comm.closestWells[miningResourceType.resourceID]) {
+            MapLocation congestedLocation = null;
+            MapLocation dangerLocation = null;
+            for (int i = 0; i < Comm.NUM_WELLS; i++) {
+                MapLocation loc = Comm.closestWells[miningResourceType.resourceID][i];
                 if (loc == null)
                     break;
-                if (congestedMines.contains(loc))
+                if (congestedMines.contains(loc)) {
+                    // congested mines are backups
+                    if (congestedLocation == null
+                            || congestedLocation.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
+                        congestedLocation = loc;
+                    }
                     continue;
-                if (miningWellLoc == null
-                        || miningWellLoc.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
-                    miningWellLoc = loc;
+                }
+
+                int enemyRound = lastEnemyOnMine.getVal(loc);
+                if (enemyRound != -1 && rc.getRoundNum() - enemyRound <= 60) {
+                    // if enemies last reported at this location, it could only be considered as backup
+                    // we choose backup based on last enemy seen
+                    if (dangerLocation == null || lastEnemyOnMine.getVal(dangerLocation) > enemyRound) {
+                        dangerLocation = loc;
+                    }
+                    // if enemies are seen congestion is much less a concern
+                    congestedMines.clear();
+                } else {
+                    if (miningWellLoc == null
+                            || miningWellLoc.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
+                        miningWellLoc = loc;
+                    }
                 }
             }
             if (miningWellLoc == null) {
-                System.out.printf("all resource of type %s congested, disintegrate", miningResourceType);
-                rc.disintegrate();
+                if (congestedLocation != null) {
+                    miningWellLoc = congestedLocation;
+                } else if (dangerLocation != null) {
+                    miningWellLoc = dangerLocation;
+                } else {
+                        System.out.printf("all resource of type %s congested, disintegrate", miningResourceType);
+                        rc.disintegrate();
+                }
             }
             state = MINING;
         }

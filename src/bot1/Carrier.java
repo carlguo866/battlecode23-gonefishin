@@ -451,6 +451,7 @@ public class Carrier extends Unit {
             miningWellLoc = null;
             MapLocation congestedLocation = null;
             MapLocation dangerLocation = null;
+            boolean enemySeen = false;
             for (int i = 0; i < Comm.NUM_WELLS; i++) {
                 MapLocation loc = Comm.closestWells[miningResourceType.resourceID][i];
                 if (loc == null)
@@ -473,6 +474,7 @@ public class Carrier extends Unit {
                     }
                     // if enemies are seen congestion is much less a concern
                     congestedMines.clear();
+                    enemySeen = true;
                 } else {
                     if (miningWellLoc == null
                             || miningWellLoc.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
@@ -481,10 +483,12 @@ public class Carrier extends Unit {
                 }
             }
             if (miningWellLoc == null) {
-                if (congestedLocation != null) {
-                    miningWellLoc = congestedLocation;
-                } else if (dangerLocation != null) {
-                    miningWellLoc = dangerLocation;
+                if (enemySeen) {
+                    if (congestedLocation != null) {
+                        miningWellLoc = congestedLocation;
+                    } else if (dangerLocation != null) {
+                        miningWellLoc = dangerLocation;
+                    }
                 } else {
                         System.out.printf("all resource of type %s congested, disintegrate", miningResourceType);
                         rc.disintegrate();

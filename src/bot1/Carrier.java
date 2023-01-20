@@ -3,6 +3,7 @@ package bot1;
 import battlecode.common.*;
 
 import java.util.Random;
+import bot1.util.FastIterableLocSet;
 
 public class Carrier extends Unit {
     // purposes
@@ -31,6 +32,7 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
+    public static FastIterableLocSet congestedMines = new FastIterableLocSet(20);
     private static Random rng;
 
     // scouting vars
@@ -376,26 +378,12 @@ public class Carrier extends Unit {
                 }
             }
         } else { // moving toward mine
-            // switch mine randomly if original too congested
+            // switch mine if original too congested
             if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 8) {
-                for (int i = 0; i < 10; i++) {
-                    MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
-                    if (loc != null && !loc.equals(miningWellLoc)) {
-                        miningWellLoc = loc;
-                        break;
-                    }
-                }
+                congestedMines.add(miningWellLoc);
+                tryFindMine();
             }
             moveToward(miningWellLoc);
-            if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 8) {
-                for (int i = 0; i < 10; i++) {
-                    MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
-                    if (loc != null && !loc.equals(miningWellLoc)) {
-                        miningWellLoc = loc;
-                        break;
-                    }
-                }
-            }
             moveToward(miningWellLoc);
             indicator += "2mine,";
         }
@@ -405,6 +393,7 @@ public class Carrier extends Unit {
         int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
         int mn = rc.getResourceAmount(ResourceType.MANA);
         if (rc.getWeight() == 0) {
+            congestedMines.clear();
             state = MINING;
             tryFindMine();
         } else if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
@@ -424,8 +413,21 @@ public class Carrier extends Unit {
             state = SCOUTING;
             scoutStartRound = rc.getRoundNum();
         } else {
-            int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
-            miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];
+            miningWellLoc = null;
+            for (MapLocation loc : Comm.closestWells[miningResourceType.resourceID]) {
+                if (loc == null)
+                    break;
+                if (congestedMines.contains(loc))
+                    continue;
+                if (miningWellLoc == null
+                        || miningWellLoc.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
+                    miningWellLoc = loc;
+                }
+            }
+            if (miningWellLoc == null) {
+                System.out.printf("all resource of type %s congested, disintegrate", miningResourceType);
+                rc.disintegrate();
+            }
             state = MINING;
         }
     }

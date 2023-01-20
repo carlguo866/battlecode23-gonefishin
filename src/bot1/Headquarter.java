@@ -12,6 +12,13 @@ public class Headquarter extends Unit {
             for (WellInfo well : rc.senseNearbyWells()) {
                 Comm.reportWells(well);
             }
+            if (Comm.friendlyHQLocations[0].equals(rc.getLocation())) {
+                trySpawn(RobotType.CARRIER, rc.getLocation(), Carrier.SCOUT_SYMMETRY);
+            }
+        }
+
+        if (!Comm.isSymmetryConfirmed && turnCount > 0 && turnCount % 150 == 0) {
+            System.out.println("too long no sym, send another sym scout");
             trySpawn(RobotType.CARRIER, rc.getLocation(), Carrier.SCOUT_SYMMETRY);
         }
 
@@ -56,6 +63,7 @@ public class Headquarter extends Unit {
         if (turnCount <= 3) { // for symmetry check
             MapRecorder.record(2000);
         }
+        Comm.commit_write();
     }
 
     // if no need to set spawn flag pass -1

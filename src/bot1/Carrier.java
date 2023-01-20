@@ -39,6 +39,7 @@ public class Carrier extends Unit {
     static MapLocation startHQLoc;
     static int scoutStartRound;
     static MapLocation scoutTarget = null;
+    static MapLocation scoutCenter = null;
     static double scoutAngle = 0;
     static WellInfo[] wellsToReport = new WellInfo[300];
     static int wellReportCnt = 0, wellSeenCnt = 0;
@@ -47,6 +48,7 @@ public class Carrier extends Unit {
         if (turnCount == 0) {
             startHQID = getClosestID(Comm.friendlyHQLocations);
             startHQLoc = Comm.friendlyHQLocations[startHQID];
+            scoutCenter = startHQLoc;
 
             rng = new Random(rc.getID());
             purpose = Comm.getSpawnFlag();
@@ -229,9 +231,9 @@ public class Carrier extends Unit {
         }
     }
     private static boolean setScoutTarget() {
-        for (; Math.abs(scoutAngle) <= Math.PI * 8;) {
+        for (; Math.abs(scoutAngle) <= Math.PI * 18;) {
             // scouting along the line r=theta
-            scoutTarget = startHQLoc.translate(
+            scoutTarget = scoutCenter.translate(
                     (int)(Math.cos(scoutAngle) * scoutAngle),
                     (int)(Math.sin(scoutAngle) * scoutAngle));
             if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
@@ -239,32 +241,39 @@ public class Carrier extends Unit {
             }
             scoutAngle += Math.PI / 6 * (rc.getID() % 2 == 0? 1 : -1);
         }
+        scoutTarget = null;
         return false;
     }
 
     private static void scoutMove() throws GameActionException {
-        if (purpose == SCOUT_SYMMETRY) {
-            if (Comm.isSymmetryConfirmed) {
-                state = REPORTING_INFO;
-            } else {
-                moveToward(new MapLocation(mapWidth / 2, mapHeight / 2));
-            }
-        } else { // mine scouting
-            if (Comm.closestWells[miningResourceType.resourceID][0] != null ||
-                wellSeenCnt > wellReportCnt) {
-                state = REPORTING_INFO;
-            } else {
-                if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
-                    if (!setScoutTarget()) {
-                        System.out.println("nothing to scout");
-                        state = 0;
-                        return;
-                    }
-                }
-                indicator += String.format("target %s,angle %.1fPI", scoutTarget, scoutAngle / Math.PI);
-                moveToward(scoutTarget);
+        if (purpose == SCOUT_SYMMETRY && rc.getRoundNum() - scoutStartRound >= 30) {
+            // if I have been scouting for 30 turns consecutively and everything the same, it really doesn't matter
+            System.out.println("sym scout too long, eliminate sym arbitrarily");
+            for (int sym = 2; sym >= 0 && !Comm.isSymmetryConfirmed; sym--) {
+                Comm.eliminateSym(sym);
             }
         }
+
+        if (purpose == SCOUT_SYMMETRY && Comm.isSymmetryConfirmed) {
+            state = REPORTING_INFO;
+            return;
+        }
+
+        if (purpose != SCOUT_SYMMETRY
+                && (Comm.closestWells[miningResourceType.resourceID][0] != null || wellSeenCnt > wellReportCnt)) {
+            state = REPORTING_INFO;
+            return;
+        }
+
+        if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
+            if (!setScoutTarget()) {
+                System.out.println("nothing to scout");
+                state = 0;
+                return;
+            }
+        }
+        indicator += String.format("target %s,angle %.1fPI", scoutTarget, scoutAngle / Math.PI);
+        moveToward(scoutTarget);
     }
 
     private static boolean isNeedReport() {
@@ -414,6 +423,7 @@ public class Carrier extends Unit {
                 tryFindMine();
             } else {
                 state = SCOUTING;
+                scoutCenter = new MapLocation(mapWidth / 2, mapHeight / 2);
                 scoutStartRound = rc.getRoundNum();
             }
         }

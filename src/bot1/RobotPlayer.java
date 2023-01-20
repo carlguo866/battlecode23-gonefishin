@@ -53,7 +53,6 @@ public strictfp class RobotPlayer {
                     case DESTABILIZER: // You might want to give them a try!
                     case AMPLIFIER:       break;
                 }
-                Comm.commit_write();
                 rc.setIndicatorString(indicator);
             } catch (GameActionException e) {
                 // Oh no! It looks like we did something illegal in the Battlecode world. You should

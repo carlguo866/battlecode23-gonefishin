@@ -14,9 +14,9 @@ public class MapRecorder extends RobotPlayer {
 
     public static int[][] vals = new int[mapWidth][mapHeight];
 
-    public static void record(int leaveBytecodeCnt) throws GameActionException {
+    public static void recordSym(int leaveBytecodeCnt) throws GameActionException {
         MapInfo[] infos = rc.senseNearbyMapInfos();
-        for (int i = infos.length; --i>=0;) {
+        for (int i = infos.length; --i >= 0; ) {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
                 return;
             }
@@ -25,9 +25,7 @@ public class MapRecorder extends RobotPlayer {
             MapInfo info = infos[i];
             int x = info.getMapLocation().x;
             int y = info.getMapLocation().y;
-            int val = vals[x][y];
-
-            val |= SEEN_BIT;
+            int val = SEEN_BIT;
             if (info.hasCloud())
                 val |= CLOUD_BIT;
             if (rc.senseWell(info.getMapLocation()) != null)
@@ -37,15 +35,13 @@ public class MapRecorder extends RobotPlayer {
             Direction current = info.getCurrentDirection();
             val |= current.ordinal();
 
-            if (Comm.isSymmetryConfirmed)
-                return;
             Direction symCurrent;
             int symVal;
             boolean isSym;
-            for (int sym = 3; --sym >= 0;) {
+            for (int sym = 3; --sym >= 0; ) {
                 if (Comm.isSymEliminated[sym])
                     continue;
-                symVal = vals[(sym & 1) == 0? mapWidth - x - 1 : x][(sym & 2) == 0? mapHeight - y - 1 : y];
+                symVal = vals[(sym & 1) == 0 ? mapWidth - x - 1 : x][(sym & 2) == 0 ? mapHeight - y - 1 : y];
                 if ((symVal & SEEN_BIT) == 0) {
                     continue;
                 }
@@ -68,6 +64,21 @@ public class MapRecorder extends RobotPlayer {
             }
 
             vals[x][y] = val;
+        }
+    }
+
+    private static MapLocation lastRecordLocation = new MapLocation(-1, -1);
+    // currently used to record whether areas have been scouted
+    public static void recordFast(int leaveBytecodeCnt) throws GameActionException {
+        if (rc.getLocation().equals(lastRecordLocation))
+            return;
+        lastRecordLocation = rc.getLocation();
+        MapInfo[] infos = rc.senseNearbyMapInfos();
+        for (int i = infos.length; --i >= 0; ) {
+            if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
+                return;
+            }
+            vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = infos[i].isPassable()? SEEN_BIT : (SEEN_BIT | PASSIABLE_BIT);
         }
     }
 }

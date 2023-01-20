@@ -54,7 +54,7 @@ public class Comm extends RobotPlayer {
     public static MapLocation[] friendlyHQLocations = {null, null, null, null};
     public static MapLocation[] enemyHQLocations = {null, null, null, null};
 
-    public static int NUM_WELLS = 3; // number of wells stored per resource
+    public static int NUM_WELLS = 5; // number of wells stored per resource
     public static MapLocation[][] closestWells = new MapLocation[4][NUM_WELLS];
 
     public static final int SPAWN_Q_LENGTH = 16;

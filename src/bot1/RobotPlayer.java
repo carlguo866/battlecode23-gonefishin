@@ -73,7 +73,6 @@ public strictfp class RobotPlayer {
                 turnCount += 1;
                 if (startRound != rc.getRoundNum()) {
                     System.out.printf("overran turn from %d to %d\n", startRound, rc.getRoundNum());
-                    continue;
                 }
                 Clock.yield();
             }

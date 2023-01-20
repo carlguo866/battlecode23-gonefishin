@@ -61,7 +61,7 @@ public class Headquarter extends Unit {
         indicator += String.format("enemy %s round %d", Comm.getEnemyLoc(), Comm.getEnemyRound());
 
         if (turnCount <= 3) { // for symmetry check
-            MapRecorder.record(2000);
+            MapRecorder.recordSym(2000);
         }
         Comm.commit_write();
     }

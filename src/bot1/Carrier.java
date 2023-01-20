@@ -111,15 +111,6 @@ public class Carrier extends Unit {
         }
     }
 
-    private static boolean shouldStopMining() {
-        if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY)
-            return true;
-        // early game optim, get launcher out asap
-        if (rc.getRoundNum() <= 100 && (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 25 || rc.getResourceAmount(ResourceType.MANA) >= 30))
-            return true;
-        return false;
-    }
-
     // sense and attack nearby enemies
     private static void senseEnemy() throws GameActionException {
         closestEnemy = null;
@@ -355,7 +346,7 @@ public class Carrier extends Unit {
     }
 
     private static void mine() throws GameActionException {
-        if (shouldStopMining()) {
+        if (rc.getWeight() < GameConstants.CARRIER_CAPACITY) {
             int hqid = getClosestID(Comm.friendlyHQLocations);
             miningHQLoc = Comm.friendlyHQLocations[hqid];
             state = DROPPING_RESOURCE;

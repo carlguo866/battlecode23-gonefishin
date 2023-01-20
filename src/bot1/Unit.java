@@ -23,7 +23,7 @@ public class Unit extends RobotPlayer {
         int starting_i = Constants.rng.nextInt(Constants.directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
             Direction dir = Constants.directions[i % 8];
-            if (rc.canMove(dir) && rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() == Direction.CENTER) rc.move(dir);
+            if (rc.canMove(dir) && canPass(dir)) rc.move(dir);
         }
     }
 
@@ -88,14 +88,14 @@ public class Unit extends RobotPlayer {
         if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 1) {
             pathingCnt = 0;
         }
+        indicator += String.format("cnt%d,", pathingCnt);
         lastPathingTarget = location;
         lastPathingTurn = turnCount;
 
         if (rc.isMovementReady()) {
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
-                while ((!rc.canMove(dir) || rc.senseMapInfo(rc.getLocation().add(dir)).getCurrentDirection() != Direction.CENTER) 
-                        && pathingCnt != 8) {
+                while ((!rc.canMove(dir) || !canPass(dir)) && pathingCnt != 8) {
                     MapLocation loc = rc.getLocation().add(dir);
                     if (rc.onTheMap(loc) && rc.senseRobotAtLocation(loc) != null && rc.senseRobotAtLocation(loc).type != RobotType.HEADQUARTERS) {
                         // a robot is blocking our way, reset and use follow instead
@@ -141,11 +141,14 @@ public class Unit extends RobotPlayer {
     }
 
     static boolean canPass(MapLocation loc) throws GameActionException {
-        if (!rc.onTheMap(loc) || !rc.senseMapInfo(loc).isPassable() || rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
+        if (!rc.onTheMap(loc) || !rc.senseMapInfo(loc).isPassable())
             return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null && robot.type == RobotType.HEADQUARTERS)
             return false;
+        // only allow empty carrier to go onto current for now
+        if (rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
+            return rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12;
         return true;
     }
 

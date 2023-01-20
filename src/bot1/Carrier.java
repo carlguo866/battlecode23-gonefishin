@@ -1,17 +1,15 @@
 package bot1;
 
 import battlecode.common.*;
-import scala.collection.immutable.Stream;
 
+import java.util.Map;
 import java.util.Random;
 
 public class Carrier extends Unit {
     // purposes
-    public static final int GO_MINE = 0; // mining is default
-    public static final int SCOUT_NE = 4;
-    public static final int SCOUT_NW = 5;
-    public static final int SCOUT_SE = 6;
-    public static final int SCOUT_SW = 7;
+    public static final int MINE_MN = 1; // mining is default
+    public static final int MINE_AD = 2;
+    public static final int SCOUT_SYMMETRY = 3;
 
     public static final int MINING = 100;
     public static final int DROPPING_RESOURCE = 101;
@@ -24,7 +22,7 @@ public class Carrier extends Unit {
 
     public static final int ANCHORING = 301;
 
-    public static int purpose = GO_MINE;
+    public static int purpose = 0;
     public static int state = 0;
     public static ResourceType miningResourceType;
     public static MapLocation miningWellLoc;
@@ -38,28 +36,28 @@ public class Carrier extends Unit {
 
     // scouting vars
     static int startHQID;
-    static Direction scoutDir;
+    static MapLocation startHQLoc;
+    static int scoutStartRound;
+    static MapLocation scoutTarget = null;
+    static double scoutAngle = 0;
     static WellInfo[] wellsToReport = new WellInfo[300];
     static int wellReportCnt = 0, wellSeenCnt = 0;
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
+            startHQID = getClosestID(Comm.friendlyHQLocations);
+            startHQLoc = Comm.friendlyHQLocations[startHQID];
+
             rng = new Random(rc.getID());
             purpose = Comm.getSpawnFlag();
-            if (purpose == GO_MINE) {
-                state = MINING;
-                findMineTarget();
-            } else {
-                state = SCOUTING;
-                startHQID = getClosestID(Comm.friendlyHQLocations);
-                if (purpose == SCOUT_NE) scoutDir = Direction.NORTHEAST;
-                else if (purpose == SCOUT_SE) scoutDir = Direction.SOUTHEAST;
-                else if (purpose == SCOUT_SW) scoutDir = Direction.SOUTHWEST;
-                else if (purpose == SCOUT_NW) scoutDir = Direction.NORTHWEST;
+            if (purpose == 0) {
+                purpose = MINE_MN;
+                System.out.println("Carrier spawn Q no flag");
             }
+            resumeWork();
         }
 
-        indicator += String.format("state%d,", state);
+        indicator += String.format("purpose%dstate%d,", purpose, state);
         checkAnchor();
         if (state == ANCHORING) {
             anchor();
@@ -89,72 +87,12 @@ public class Carrier extends Unit {
         }
 
         if (state == MINING) {
-            if (shouldStopMining()) {
-                int hqid = getClosestID(Comm.friendlyHQLocations);
-                miningHQLoc = Comm.friendlyHQLocations[hqid];
-                state = DROPPING_RESOURCE;
-            } else if (rc.canCollectResource(miningWellLoc, -1)) {
-                rc.collectResource(miningWellLoc, -1);
-                indicator += "collecting,";
-                // moving pattern to allow others to join
-                Direction dir = rc.getLocation().directionTo(miningWellLoc);
-                // if can move on to the mine, do it
-                if (dir != Direction.CENTER) {
-                    if (rc.canMove(dir)) {
-                        rc.move(dir);
-                    } else { // or try to move in a circle
-                        if (dir == Direction.NORTHEAST || dir == Direction.NORTHWEST || dir == Direction.SOUTHEAST || dir == Direction.SOUTHWEST) {
-                            dir = dir.rotateRight();
-                        } else {
-                            dir = dir.rotateRight().rotateRight();
-                        }
-                        if (rc.canMove(dir)) rc.move(dir);
-                    }
-                }
-            } else { // moving toward mine
-                // switch mine randomly if original too congested
-                if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
-                    for (int i = 0; i < 10; i++) {
-                        MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
-                        if (loc != null && !loc.equals(miningWellLoc)) {
-                            miningWellLoc = loc;
-                            break;
-                        }
-                    }
-                }
-                moveToward(miningWellLoc);
-                if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
-                    for (int i = 0; i < 10; i++) {
-                        MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
-                        if (loc != null && !loc.equals(miningWellLoc)) {
-                            miningWellLoc = loc;
-                            break;
-                        }
-                    }
-                }
-                moveToward(miningWellLoc);
-                indicator += "going to mine,";
-            }
+            mine();
         }
 
         if (state == DROPPING_RESOURCE) {
-            int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
-            int mn = rc.getResourceAmount(ResourceType.MANA);
-            if (rc.getWeight() == 0) {
-                state = MINING;
-                findMineTarget();
-            } else if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
-                rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
-                indicator += "dropping";
-            } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
-                rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
-                indicator += "dropping";
-            } else {
-                moveToward(miningHQLoc);
-                indicator += "going to drop";
-            }
+            dropResource();
         }
-
     }
 
     private static boolean shouldStopMining() {
@@ -277,57 +215,56 @@ public class Carrier extends Unit {
                     break;
                 }
             }
+            for (int i = 0; i < Comm.NUM_WELLS; i++) {
+                if (Comm.closestWells[well.getResourceType().resourceID][i] == null)
+                    break;
+                if (Comm.closestWells[well.getResourceType().resourceID][i].equals(well.getMapLocation())) {
+                    seenWell = true;
+                    break;
+                }
+            }
             if (!seenWell) {
                 wellsToReport[wellSeenCnt++] = well;
             }
         }
     }
+    private static boolean setScoutTarget() {
+        for (; Math.abs(scoutAngle) <= Math.PI * 8;) {
+            // scouting along the line r=theta
+            scoutTarget = startHQLoc.translate(
+                    (int)(Math.cos(scoutAngle) * scoutAngle),
+                    (int)(Math.sin(scoutAngle) * scoutAngle));
+            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
+                return true;
+            }
+            scoutAngle += Math.PI / 6 * (rc.getID() % 2 == 0? 1 : -1);
+        }
+        return false;
+    }
+
     private static void scoutMove() throws GameActionException {
-        if (Math.sqrt(getClosestDis(Comm.enemyHQLocations)) - 3 <= Math.sqrt(getClosestDis(Comm.friendlyHQLocations))) {
-            indicator += "close2E,endscout,";
-            state = REPORTING_INFO;
-            return;
-        }
-        int closestHQID = getClosestID(Comm.friendlyHQLocations);
-        if (closestHQID != startHQID
-                && Comm.friendlyHQLocations[closestHQID].distanceSquaredTo(rc.getLocation()) <= 64) {
-            indicator += "close2HQ,endscout,";
-            state = REPORTING_INFO;
-            return;
-        }
-        int dx = scoutDir.dx;
-        int dy = scoutDir.dy;
-        for (RobotInfo robot : rc.senseNearbyRobots(-1, myTeam)) {
-            Direction dir = rc.getLocation().directionTo(robot.location);
-            if (robot.type == RobotType.CARRIER && (dir == scoutDir || dir == scoutDir.rotateLeft() || dir == scoutDir.rotateRight())) {
-                indicator += String.format("scout%s", scoutDir);
-                indicator += String.format("dir%sendscout,", dir);
+        if (purpose == SCOUT_SYMMETRY) {
+            if (Comm.isSymmetryConfirmed) {
                 state = REPORTING_INFO;
-                return;
+            } else {
+                moveToward(new MapLocation(mapWidth / 2, mapHeight / 2));
+            }
+        } else { // mine scouting
+            if (Comm.closestWells[miningResourceType.resourceID][0] != null ||
+                wellSeenCnt > wellReportCnt) {
+                state = REPORTING_INFO;
+            } else {
+                if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
+                    if (!setScoutTarget()) {
+                        System.out.println("nothing to scout");
+                        state = 0;
+                        return;
+                    }
+                }
+                indicator += String.format("target %s,angle %.1fPI", scoutTarget, scoutAngle / Math.PI);
+                moveToward(scoutTarget);
             }
         }
-        // no need to go too close to edge in one direction
-        if ((dx > 0 && mapWidth - rc.getLocation().x <= 4)
-                || (dx < 0 && rc.getLocation().x <= 3)) {
-            dx = 0;
-        }
-        if ((dy > 0 && mapHeight - rc.getLocation().y <= 4)
-                || (dy < 0 && rc.getLocation().y <= 3)) {
-            dy = 0;
-        }
-        scoutDir = Dxy2dir(dx, dy);
-        if (scoutDir == Direction.CENTER) {
-            indicator += "gotcorner,endscout";
-            state = REPORTING_INFO;
-            return;
-        }
-        if (rc.getRoundNum() >= 12) {
-            indicator += "timereached,endscout";
-            state = REPORTING_INFO;
-            return;
-        }
-
-        tryMoveDir(scoutDir);
     }
 
     private static boolean isNeedReport() {
@@ -359,20 +296,14 @@ public class Carrier extends Unit {
         }
         // state transitions
         indicator += "notneedreport,";
-        if (state == REPORT_AND_RUNAWAY) {
-            state = RUNAWAY;
-        } else { // state == REPORT_INFO
-            findMineTarget();
-            state = MINING;
-        }
+        resumeWork();
     }
 
     private static void runaway() throws GameActionException {
         if (state == RUNAWAY) {
             indicator += "run,";
             if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
-                findMineTarget();
-                state = MINING;
+                resumeWork();
             } else {
                 Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
                 Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
@@ -392,14 +323,99 @@ public class Carrier extends Unit {
         }
     }
 
-    private static void findMineTarget() {
-        if (Comm.closestWells[ResourceType.MANA.resourceID][0] == null) {
-            miningResourceType = ResourceType.ADAMANTIUM;
+    private static void tryFindMine() {
+        if (Comm.closestWells[miningResourceType.resourceID][0] == null) {
+            state = SCOUTING;
+            scoutStartRound = rc.getRoundNum();
         } else {
-            // Mine AD with 1/3 prob if both mines available
-            miningResourceType = rng.nextInt(3) == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
+            int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
+            miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];
+            state = MINING;
         }
-        int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
-        miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];
+    }
+
+    private static void mine() throws GameActionException {
+        if (shouldStopMining()) {
+            int hqid = getClosestID(Comm.friendlyHQLocations);
+            miningHQLoc = Comm.friendlyHQLocations[hqid];
+            state = DROPPING_RESOURCE;
+        } else if (rc.canCollectResource(miningWellLoc, -1)) {
+            rc.collectResource(miningWellLoc, -1);
+            indicator += "collecting,";
+            // moving pattern to allow others to join
+            Direction dir = rc.getLocation().directionTo(miningWellLoc);
+            // if can move on to the mine, do it
+            if (dir != Direction.CENTER) {
+                if (rc.canMove(dir)) {
+                    rc.move(dir);
+                } else { // or try to move in a circle
+                    if (dir == Direction.NORTHEAST || dir == Direction.NORTHWEST || dir == Direction.SOUTHEAST || dir == Direction.SOUTHWEST) {
+                        dir = dir.rotateRight();
+                    } else {
+                        dir = dir.rotateRight().rotateRight();
+                    }
+                    if (rc.canMove(dir)) rc.move(dir);
+                }
+            }
+        } else { // moving toward mine
+            // switch mine randomly if original too congested
+            if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
+                for (int i = 0; i < 10; i++) {
+                    MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
+                    if (loc != null && !loc.equals(miningWellLoc)) {
+                        miningWellLoc = loc;
+                        break;
+                    }
+                }
+            }
+            moveToward(miningWellLoc);
+            if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 7) {
+                for (int i = 0; i < 10; i++) {
+                    MapLocation loc = Comm.closestWells[miningResourceType.resourceID][Constants.rng.nextInt(Comm.NUM_WELLS)];
+                    if (loc != null && !loc.equals(miningWellLoc)) {
+                        miningWellLoc = loc;
+                        break;
+                    }
+                }
+            }
+            moveToward(miningWellLoc);
+            indicator += "going to mine,";
+        }
+    }
+
+    private static void dropResource() throws GameActionException {
+        int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
+        int mn = rc.getResourceAmount(ResourceType.MANA);
+        if (rc.getWeight() == 0) {
+            state = MINING;
+            tryFindMine();
+        } else if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
+            rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
+            indicator += "dropping";
+        } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
+            rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
+            indicator += "dropping";
+        } else {
+            moveToward(miningHQLoc);
+            indicator += "going to drop";
+        }
+    }
+
+    // after reporting info or running away
+    private static void resumeWork() {
+        if (purpose == MINE_AD || purpose == MINE_MN) {
+            miningResourceType = purpose == MINE_AD? ResourceType.ADAMANTIUM : ResourceType.MANA;
+            tryFindMine();
+        } else { // symmetry scouting
+            if (Comm.isSymmetryConfirmed) {
+                System.out.println("sym confirmed as sym scout, go mine");
+                purpose = (rng.nextInt(2) == 0? MINE_AD : MINE_MN);
+                miningResourceType = purpose == MINE_AD? ResourceType.ADAMANTIUM : ResourceType.MANA;
+                tryFindMine();
+            } else {
+                state = SCOUTING;
+                scoutStartRound = rc.getRoundNum();
+            }
+        }
     }
 }

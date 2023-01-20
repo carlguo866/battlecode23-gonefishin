@@ -20,13 +20,13 @@ import java.awt.*;
  * each type containing 3 coords repping the 3 wells
  * 12 bits: well location
  *
- * spawn queue bit 208 - 335
- * length: 8
- * each of 16 bits, total of 128 bits
+ * spawn queue bit 208 - 463
+ * length: 16
+ * each of 16 bits, total of 256 bits
  * 12 bit: coord
  * 4 bit flag
  *
- * enemy report starting bit 336 - 359
+ * enemy report starting bit 464 - 487
  * each of:
  * 12 bit: coord
  * 12 bits: last seen round number, could be % 64 later
@@ -40,8 +40,8 @@ public class Comm extends RobotPlayer {
     private static final int SYM_BIT = 48;
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
-    private static final int ENEMY_BIT = 336;
-    private static final int ISLAND_BIT = 360;
+    private static final int ENEMY_BIT = 487;
+    private static final int ISLAND_BIT = 488;
 
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
@@ -57,7 +57,7 @@ public class Comm extends RobotPlayer {
     public static int NUM_WELLS = 3; // number of wells stored per resource
     public static MapLocation[][] closestWells = new MapLocation[4][NUM_WELLS];
 
-    public static final int SPAWN_Q_LENGTH = 8;
+    public static final int SPAWN_Q_LENGTH = 16;
 
     public static void turn_starts() throws GameActionException {
         // TODO only update constant like variable (eg no spawn Q)
@@ -209,7 +209,7 @@ public class Comm extends RobotPlayer {
         for (int i = locVal; i < locVal + SPAWN_Q_LENGTH; i++) {
             int oldLoc = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 12);
             if (oldLoc == 0) {
-                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, (locVal << 4) + flag);
+                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, (locVal << 4) | flag);
                 return true;
             }
         }

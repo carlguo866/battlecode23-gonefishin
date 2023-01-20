@@ -3,6 +3,8 @@ package bot1;
 import battlecode.common.*;
 
 public class Headquarter extends Unit {
+    private static int carrierCnt = 0;
+
     public static void run() throws GameActionException {
         if (turnCount == 0) {
             // first turn all HQ report
@@ -10,26 +12,8 @@ public class Headquarter extends Unit {
             for (WellInfo well : rc.senseNearbyWells()) {
                 Comm.reportWells(well);
             }
+            trySpawn(RobotType.CARRIER, rc.getLocation(), Carrier.SCOUT_SYMMETRY);
         }
-
-        if (turnCount <= 3) {
-            MapRecorder.record(4000);
-
-            Direction[] SPAWN_DIR = {Direction.SOUTHEAST, Direction.SOUTHWEST, Direction.NORTHEAST, Direction.NORTHWEST};
-            int[] PURPURSES = {Carrier.SCOUT_SE, Carrier.SCOUT_SW, Carrier.SCOUT_NE, Carrier.SCOUT_NW};
-            MapLocation spawnLocation = rc.getLocation().add(SPAWN_DIR[turnCount]).add(SPAWN_DIR[turnCount]);
-                for (int[] dir : BFS25) {
-                    MapLocation location = new MapLocation(spawnLocation.x + dir[0], spawnLocation.y + dir[1]);
-                    if(rc.canBuildRobot(RobotType.CARRIER, location)
-                            && rc.senseMapInfo(location).getCurrentDirection() == Direction.CENTER) {
-                        rc.buildRobot(RobotType.CARRIER, location);
-                        Comm.trySetSpawnFlag(location, PURPURSES[turnCount]);
-                        break;
-                    }
-                }
-            return; // TODO fix this to allow multiple spawn per turn
-        }
-//        indicator += String.format("AD %s %s %sMN %s %s %s", Comm.closestWells[1][0],Comm.closestWells[1][1],Comm.closestWells[1][2], Comm.closestWells[2][0], Comm.closestWells[2][1], Comm.closestWells[2][2]);
 
         if (rc.getRobotCount() >= mapWidth * mapHeight * 0.15) {
             // this means we have basically won already, build anchor
@@ -39,27 +23,17 @@ public class Headquarter extends Unit {
             indicator += "anchoring";
         } else {
             // spawn Launchers
-            if (rc.getResourceAmount(ResourceType.MANA) >= Constants.LAUNCHER_COST_MN) { // can build launcher
+            for (int i = 5; --i >= 0
+                    && rc.isActionReady()
+                    && rc.getResourceAmount(ResourceType.MANA) >= Constants.LAUNCHER_COST_MN;) {
                 Direction dirToCenter = rc.getLocation().directionTo(new MapLocation(mapWidth / 2, mapHeight / 2));
                 MapLocation spawnLocation = rc.getLocation().add(dirToCenter).add(dirToCenter);
-                for (int[] dir : BFS25) {
-                    MapLocation location = new MapLocation(spawnLocation.x + dir[0], spawnLocation.y + dir[1]);
-                    if(rc.canBuildRobot(RobotType.LAUNCHER, location)
-                            && rc.senseMapInfo(location).getCurrentDirection() == Direction.CENTER) {
-                        rc.buildRobot(RobotType.LAUNCHER, location);
-                        break;
-                    }
-                }
+                trySpawn(RobotType.LAUNCHER, spawnLocation, -1);
             }
-            // spawn carrier if possible
-            if (turnCount >= 1 && rc.getResourceAmount(ResourceType.ADAMANTIUM) >= Constants.CARRIER_COST_AD) {
-                for (int[] dir : BFS25) {
-                    MapLocation location = new MapLocation(rc.getLocation().x + dir[0], rc.getLocation().y + dir[1]);
-                    if(rc.canBuildRobot(RobotType.CARRIER, location)
-                            && rc.senseMapInfo(location).getCurrentDirection() == Direction.CENTER) {
-                        rc.buildRobot(RobotType.CARRIER, location);
-                    }
-                }
+            for (int i = 5; --i >= 0
+                    && rc.isActionReady()
+                    && rc.getResourceAmount(ResourceType.ADAMANTIUM) >= Constants.CARRIER_COST_AD;) {
+                trySpawn(RobotType.CARRIER, rc.getLocation(), ++carrierCnt % 3 == 0? Carrier.MINE_AD : Carrier.MINE_MN);
             }
         }
 
@@ -78,5 +52,26 @@ public class Headquarter extends Unit {
             Comm.reportEnemy(closestEnemy.location, rc.getRoundNum());
         }
         indicator += String.format("enemy %s round %d", Comm.getEnemyLoc(), Comm.getEnemyRound());
+
+        if (turnCount <= 3) { // for symmetry check
+            MapRecorder.record(2000);
+        }
+    }
+
+    // if no need to set spawn flag pass -1
+    private static boolean trySpawn(RobotType robotType, MapLocation center, int spawnFlag) throws GameActionException {
+        for (int[] dir : BFS25) {
+            MapLocation location = new MapLocation(center.x + dir[0], center.y + dir[1]);
+            if(rc.canBuildRobot(robotType, location)
+                    && rc.senseMapInfo(location).getCurrentDirection() == Direction.CENTER) {
+                if (spawnFlag > 0 && !Comm.trySetSpawnFlag(location, spawnFlag)) {
+                    System.out.println("try spawn failed Q full");
+                    return false;
+                }
+                rc.buildRobot(robotType, location);
+                return true;
+            }
+        }
+        return false;
     }
 }

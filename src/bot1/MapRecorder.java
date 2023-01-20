@@ -109,10 +109,4 @@ public class MapRecorder extends RobotPlayer {
         return set;
     }
 
-//    public static
-    /*
-    If I am the one with the most resources and I am on the mine, try to move away
-    If I am not on the mine with the least resource, try to move onto the mine
-
-    * */
 }

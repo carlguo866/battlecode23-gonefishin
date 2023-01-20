@@ -359,19 +359,41 @@ public class Carrier extends Unit {
                 rc.collectResource(miningWellLoc, -1);
             }
             indicator += "mine,";
-            // moving pattern to allow others to join
-            Direction dir = rc.getLocation().directionTo(miningWellLoc);
-            // if can move on to the mine, do it
-            if (dir != Direction.CENTER) {
-                if (rc.canMove(dir)) {
-                    rc.move(dir);
-                } else { // or try to move in a circle
-                    if (dir == Direction.NORTHEAST || dir == Direction.NORTHWEST || dir == Direction.SOUTHEAST || dir == Direction.SOUTHWEST) {
-                        dir = dir.rotateRight();
-                    } else {
-                        dir = dir.rotateRight().rotateRight();
+            // move in pattern to allow others to join
+            Direction dirToMine = rc.getLocation().directionTo(miningWellLoc);
+            if (dirToMine == Direction.CENTER && rc.isMovementReady()) {
+                int hqid = getClosestID(Comm.friendlyHQLocations);
+                miningHQLoc = Comm.friendlyHQLocations[hqid];
+                // robot in the center moves away to the closest minable square to home HQ
+                FastIterableLocSet set = MapRecorder.getMinableSquares(miningWellLoc);
+                set.updateIterable();
+                MapLocation moveLoc = null;
+                for (int i = set.size; --i >= 0;) {
+                    if (!set.locs[i].equals(miningWellLoc) && rc.canMove(rc.getLocation().directionTo(set.locs[i]))) {
+                        if (moveLoc == null || miningHQLoc.distanceSquaredTo(moveLoc) > miningHQLoc.distanceSquaredTo(set.locs[i])) {
+                            moveLoc = set.locs[i];
+                        }
                     }
-                    if (rc.canMove(dir)) rc.move(dir);
+                }
+                if (moveLoc != null) {
+                    rc.move(rc.getLocation().directionTo(moveLoc));
+                }
+            } else if (rc.canMove(dirToMine)) {
+                // robot with the least resource go to the center of the mine
+                // or if I sensed a carrier waiting to get in adjacent to, I move to center
+                boolean leastResource = true;
+                boolean teammateAdjacent = false;
+                for (RobotInfo robot: rc.senseNearbyRobots(miningWellLoc, 8, myTeam)) {
+                    if (robot.location.isAdjacentTo(miningWellLoc)) {
+                        if (robot.getResourceAmount(ResourceType.MANA) + robot.getResourceAmount(ResourceType.ADAMANTIUM) < rc.getWeight()) {
+                            leastResource = false;
+                        }
+                    } else if (robot.location.isAdjacentTo(rc.getLocation()) && robot.getResourceAmount(ResourceType.MANA) + robot.getResourceAmount(ResourceType.ADAMANTIUM) < 39) {
+                        teammateAdjacent = true;
+                    }
+                }
+                if (leastResource || teammateAdjacent) {
+                    rc.move(dirToMine);
                 }
             }
         } else { // moving toward mine

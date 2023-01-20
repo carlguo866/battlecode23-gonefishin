@@ -23,7 +23,7 @@ public class Unit extends RobotPlayer {
         int starting_i = Constants.rng.nextInt(Constants.directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
             Direction dir = Constants.directions[i % 8];
-            if (rc.canMove(dir) && canPass(dir)) rc.move(dir);
+            if (rc.canMove(dir)) rc.move(dir);
         }
     }
 
@@ -81,6 +81,8 @@ public class Unit extends RobotPlayer {
     private static Direction[] prv = new Direction[PRV_LENGTH];
     private static int pathingCnt = 0;
     private static MapLocation lastPathingTarget = null;
+    private static MapLocation lastLocation = null;
+    private static int stuckCnt = 0;
     private static int lastPathingTurn = 0;
 
     static void moveToward(MapLocation location) throws GameActionException {
@@ -93,6 +95,18 @@ public class Unit extends RobotPlayer {
         lastPathingTurn = turnCount;
 
         if (rc.isMovementReady()) {
+            if (rc.getLocation().equals(lastLocation)) {
+                stuckCnt += 1;
+            } else {
+                stuckCnt = 0;
+            }
+            lastLocation = rc.getLocation();
+            if (stuckCnt > 5) {
+                indicator += "stuck reset";
+                randomMove();
+                pathingCnt = 0;
+            }
+
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
                 while ((!rc.canMove(dir) || !canPass(dir)) && pathingCnt != 8) {

@@ -1,6 +1,7 @@
 package bot1;
 
 import battlecode.common.*;
+import bot1.util.FastIterableLocSet;
 
 public class MapRecorder extends RobotPlayer {
     // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting
@@ -10,6 +11,7 @@ public class MapRecorder extends RobotPlayer {
     public static final int WELL_BIT = 1 << 6;
     public static final int PASSIABLE_BIT = 1 << 7;
     public static final int ISLAND_BIT = 1 << 8;
+    public static final int CURRENT_MASK = 0xF;
     // current use & 0xF for ordinal
 
     public static int[][] vals = new int[mapWidth][mapHeight];
@@ -78,7 +80,39 @@ public class MapRecorder extends RobotPlayer {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
                 return;
             }
-            vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = infos[i].isPassable()? SEEN_BIT : (SEEN_BIT | PASSIABLE_BIT);
+            vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = (infos[i].isPassable()? SEEN_BIT : (SEEN_BIT | PASSIABLE_BIT)) | infos[i].getCurrentDirection().ordinal();
         }
     }
+
+    public static FastIterableLocSet getMinableSquares(MapLocation mineLoc) {
+        FastIterableLocSet set = new FastIterableLocSet(10);
+        set.add(mineLoc);
+        for (int i = 8; --i>=0;) {
+            MapLocation loc = mineLoc.add(Constants.directions[i]);
+            if (!rc.onTheMap(loc)) {
+                continue;
+            }
+            int val = vals[loc.x][loc.y];
+            if ((val & SEEN_BIT) == 0) {
+                set.add(loc);
+            } else {
+                if ((val & PASSIABLE_BIT) != 0)
+                    continue;
+                Direction dir = Direction.values()[val & CURRENT_MASK];
+                MapLocation blowInto = loc.add(dir);
+                if (blowInto.isAdjacentTo(mineLoc) ||
+                        (rc.onTheMap(blowInto) && (vals[blowInto.x][blowInto.y] & PASSIABLE_BIT) == 0)) {
+                    set.add(loc);
+                }
+            }
+        }
+        return set;
+    }
+
+//    public static
+    /*
+    If I am the one with the most resources and I am on the mine, try to move away
+    If I am not on the mine with the least resource, try to move onto the mine
+
+    * */
 }

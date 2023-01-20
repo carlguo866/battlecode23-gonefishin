@@ -376,7 +376,8 @@ public class Carrier extends Unit {
             }
         } else { // moving toward mine
             // switch mine if original too congested
-            if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= 8) {
+            if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= MapRecorder.getMinableSquares(miningWellLoc).size - 1) {
+                indicator += "congest";
                 congestedMines.add(miningWellLoc);
                 tryFindMine();
             }

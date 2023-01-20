@@ -18,7 +18,6 @@ public class Unit extends RobotPlayer {
             {2, 2}, {2, -2}, {-2, 2}, {-2, -2}
     };
 
-    // TODO path finding
     static void randomMove() throws GameActionException {
         int starting_i = Constants.rng.nextInt(Constants.directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
@@ -83,62 +82,180 @@ public class Unit extends RobotPlayer {
     private static MapLocation lastPathingTarget = null;
     private static int lastPathingTurn = 0;
 
-    static void moveToward(MapLocation location) throws GameActionException {
-        // reset queue when target location changes or there's gap in between calls
-        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 1) {
-            pathingCnt = 0;
-        }
-        indicator += String.format("cnt%d,", pathingCnt);
-        lastPathingTarget = location;
-        lastPathingTurn = turnCount;
+    static int heuristicDis(MapLocation a, MapLocation b) {
+        return (int)Math.sqrt((double)a.distanceSquaredTo(b));
+        //return Math.max(Math.abs(a.x-b.x), Math.abs(a.y-b.y));
+    }
 
-        if (rc.isMovementReady()) {
-            if (pathingCnt == 0) {
-                Direction dir = rc.getLocation().directionTo(location);
-                while ((!rc.canMove(dir) || !canPass(dir)) && pathingCnt != 8) {
-                    MapLocation loc = rc.getLocation().add(dir);
-                    if (rc.onTheMap(loc) && rc.senseRobotAtLocation(loc) != null && rc.senseRobotAtLocation(loc).type != RobotType.HEADQUARTERS) {
-                        // a robot is blocking our way, reset and use follow instead
-                        pathingCnt = 0;
-                        indicator += "use follow,";
-                        follow(location);
-                        return;
+    static int getId(MapLocation a){
+        return (a.x + 3) * 65 + (a.y + 3);
+    }
+
+    private static boolean[] visited = new boolean[4000];
+    static double getAngle(MapLocation a, MapLocation b) {
+        double angle = (double) Math.toDegrees(Math.atan2(b.y - a.y, b.x - a.x));
+    
+        if(angle < 0){
+            angle += 360;
+        }
+    
+        return angle;
+    }
+
+    static int bestMetric = 10000;
+    static MapLocation lasttarget;
+    static int staycount = 0;
+    static void moveToward(MapLocation location) throws GameActionException {
+        Direction dir;
+        MapLocation now = rc.getLocation();
+        MapLocation target = location;
+        MapLocation target2 = location;
+        dir = now.directionTo(target);
+        now = now.add(dir);
+        System.out.println("*********");
+        System.out.println(location);
+        System.out.println(dir);
+        MapLocation[] queue = new MapLocation[100];
+        int head = 0;
+        int tail = 0;
+        while (rc.canSenseLocation(now) && rc.onTheMap(now)) {
+            if (now.x == target.x && now.y == target.y) {
+                break;
+            }
+            System.out.println("------------");
+            System.out.println(now);
+            MapInfo info = rc.senseMapInfo(now);
+            if (!info.isPassable() || info.getCurrentDirection() == dir.opposite() ||
+            rc.senseRobotAtLocation(now) != null) {
+                head = 0;
+                tail = 0;
+                queue[0] = now;
+                visited[getId(now)] = true;
+                visited[getId(rc.getLocation())] = true;
+                double leftmost = 0;
+                double rightmost = 0;
+                MapLocation left = now;
+                MapLocation right = now;
+                double ang0 = getAngle(rc.getLocation(), now);
+                System.out.println("=========");
+                while (head <= tail) {
+                    MapLocation top = queue[head++];
+                    System.out.println(top);
+                    double ang = getAngle(rc.getLocation(), top) - ang0;
+                    if (ang < -180) ang += 360;
+                    if (ang > 180) ang = ang - 360;
+                    if (ang > leftmost) {
+                        leftmost = ang;
+                        left = top;
                     }
-                    prv[pathingCnt] = dir;
-                    pathingCnt++;
-                    dir = dir.rotateLeft();
-                }
-                if (pathingCnt != 8) {
-                    rc.move(dir);
-                } else {
-                    // we are blocked in all directions, nothing to do
-                    indicator += "perma blocked,";
-                    pathingCnt = 0;
-                    return;
-                }
-            } else {
-                while (pathingCnt > 0 && canPass(prv[pathingCnt - 1])) {
-                    pathingCnt--;
-                }
-                while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateLeft())) {
-                    prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();;
-                    pathingCnt++;
-                    if (pathingCnt == PRV_LENGTH) {
-                        pathingCnt = 0;
-                        return;
+                    if (ang < rightmost) {
+                        rightmost = ang;
+                        right = top;
+                    }
+                    MapLocation neigh = top.add(Direction.EAST);
+                    if (rc.canSenseLocation(neigh) && !visited[getId(neigh)]) {
+                        if (!rc.onTheMap(neigh)) {
+                            queue[++tail] = neigh;
+                            visited[getId(neigh)] = true;
+                        }
+                        else {
+                            info = rc.senseMapInfo(neigh);
+                            if (!info.isPassable() || 
+                            (rc.senseRobotAtLocation(neigh) != null && rc.senseRobotAtLocation(neigh).getType() == RobotType.HEADQUARTERS)) {
+                                queue[++tail] = neigh;
+                                visited[getId(neigh)] = true;
+                            }
+                        }
+                    }
+                    neigh = top.add(Direction.WEST);
+                    if (rc.canSenseLocation(neigh) && !visited[getId(neigh)]) {
+                        if (!rc.onTheMap(neigh)) {
+                            queue[++tail] = neigh;
+                            visited[getId(neigh)] = true;
+                        }
+                        else {
+                            info = rc.senseMapInfo(neigh);
+                            if (!info.isPassable() || 
+                            (rc.senseRobotAtLocation(neigh) != null && rc.senseRobotAtLocation(neigh).getType() == RobotType.HEADQUARTERS)) {
+                                queue[++tail] = neigh;
+                                visited[getId(neigh)] = true;
+                            }
+                        }
+                    }
+                    neigh = top.add(Direction.SOUTH);
+                    if (rc.canSenseLocation(neigh) && !visited[getId(neigh)]) {
+                        if (!rc.onTheMap(neigh)) {
+                            queue[++tail] = neigh;
+                            visited[getId(neigh)] = true;
+                        }
+                        else {
+                            info = rc.senseMapInfo(neigh);
+                            if (!info.isPassable() ||
+                            (rc.senseRobotAtLocation(neigh) != null && rc.senseRobotAtLocation(neigh).getType() == RobotType.HEADQUARTERS)) {
+                                queue[++tail] = neigh;
+                                visited[getId(neigh)] = true;
+                            }
+                        }
+                    }
+                    neigh = top.add(Direction.NORTH);
+                    if (rc.canSenseLocation(neigh) && !visited[getId(neigh)]) {
+                        if (!rc.onTheMap(neigh)) {
+                            queue[++tail] = neigh;
+                            visited[getId(neigh)] = true;
+                        }
+                        else {
+                            info = rc.senseMapInfo(neigh);
+                            if (!info.isPassable() || 
+                            (rc.senseRobotAtLocation(neigh) != null && rc.senseRobotAtLocation(neigh).getType() == RobotType.HEADQUARTERS)) {
+                                queue[++tail] = neigh;
+                                visited[getId(neigh)] = true;
+                            }
+                        }
                     }
                 }
-                Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
-                if (rc.canMove(moveDir)) {
-                    rc.move(moveDir);
-                } else {
-                    // a robot blocking us while we are following wall, wait
-                    indicator += "blocked";
-                    return;
+                for (int i = 0; i <= tail; i++) {
+                    visited[getId(queue[i])] = false;
                 }
+                if (heuristicDis(rc.getLocation(), left) + heuristicDis(left, target) < 
+                    heuristicDis(rc.getLocation(), right) + heuristicDis(right, target)) {
+                    target = left.add(rc.getLocation().directionTo(left).rotateLeft().rotateLeft());
+                    target2 = right.add(rc.getLocation().directionTo(right).rotateRight().rotateRight());
+                }
+                else {
+                    target = right.add(rc.getLocation().directionTo(right).rotateRight().rotateRight());
+                    target2 = left.add(rc.getLocation().directionTo(left).rotateLeft().rotateLeft());
+                }
+                now = rc.getLocation();
+            }
+            
+            dir = now.directionTo(target);
+            now = now.add(dir);
+        }
+        int newmetric = heuristicDis(rc.getLocation(), target) + heuristicDis(location, target);
+        if (lasttarget == null || lasttarget.x != location.x || lasttarget.y != location.y) {
+            lasttarget = location;
+            bestMetric = newmetric;
+        }
+        else if (newmetric >= bestMetric) {
+            target = target2;
+        }
+        //System.out.println("$$$$$$$");
+        //System.out.println(startingdir);
+        if (rc.canMove(rc.getLocation().directionTo(target))){
+            rc.move(rc.getLocation().directionTo(target));
+            staycount = 0;
+        }
+        else {
+            staycount += 1;
+            if (staycount > 3) {
+                randomMove();
+                staycount = 0;
             }
         }
     }
+
+    
+
 
     static boolean canPass(MapLocation loc) throws GameActionException {
         if (!rc.onTheMap(loc) || !rc.senseMapInfo(loc).isPassable())

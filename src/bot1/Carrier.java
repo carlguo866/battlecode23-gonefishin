@@ -111,15 +111,6 @@ public class Carrier extends Unit {
         }
     }
 
-    private static boolean shouldStopMining() {
-        if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY)
-            return true;
-        // early game optim, get launcher out asap
-        if (rc.getRoundNum() <= 100 && (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 25 || rc.getResourceAmount(ResourceType.MANA) >= 30))
-            return true;
-        return false;
-    }
-
     // sense and attack nearby enemies
     private static void senseEnemy() throws GameActionException {
         closestEnemy = null;
@@ -355,12 +346,18 @@ public class Carrier extends Unit {
     }
 
     private static void mine() throws GameActionException {
-        if (shouldStopMining()) {
+        if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY) {
             int hqid = getClosestID(Comm.friendlyHQLocations);
             miningHQLoc = Comm.friendlyHQLocations[hqid];
             state = DROPPING_RESOURCE;
-        } else if (rc.canCollectResource(miningWellLoc, -1)) {
-            rc.collectResource(miningWellLoc, -1);
+        } else if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
+            // may be able to collect twice per turn
+            if (rc.canCollectResource(miningWellLoc, -1)) {
+                rc.collectResource(miningWellLoc, -1);
+            }
+            if (rc.canCollectResource(miningWellLoc, -1)) {
+                rc.collectResource(miningWellLoc, -1);
+            }
             indicator += "mine,";
             // moving pattern to allow others to join
             Direction dir = rc.getLocation().directionTo(miningWellLoc);

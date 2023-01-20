@@ -1,10 +1,16 @@
-package submit8micro.submit8;
+package submit10;
 
 import battlecode.common.Direction;
 
 import java.util.Random;
 
 public class Constants {
+    public static final int LAUNCHER_COST_MN = 60;
+    public static final int LAUNCHER_ATTACK_DIS = 16;
+
+    public static final int CARRIER_COST_AD = 50;
+    public static final int CARRIER_ATTACK_DIS = 9;
+
     /** Array containing all the possible movement directions. */
     public static final Direction[] directions = {
             Direction.NORTH,

@@ -1,16 +1,12 @@
-package launcher_micro.bot1;
+package submit10;
 
 import battlecode.common.*;
 
-public class Carrier extends Unit {
-    private static final int MAX_WEIGHT = 40; // tunable later
-    private static final int ATTACK_DIS = 9;
+import java.util.Random;
 
-    public static final int AWAIT_CMD = 0;
-    // for mining purposes, int value equal ResourceType
-    public static final int GO_MINE = 1;
-//    public static final int MINE_MN = 2;
-//    public static final int MINE_EL = 3;
+public class Carrier extends Unit {
+    // purposes
+    public static final int GO_MINE = 0; // mining is default
     public static final int SCOUT_NE = 4;
     public static final int SCOUT_NW = 5;
     public static final int SCOUT_SE = 6;
@@ -27,7 +23,7 @@ public class Carrier extends Unit {
 
     public static final int ANCHORING = 301;
 
-    public static int purpose = AWAIT_CMD;
+    public static int purpose = GO_MINE;
     public static int state = 0;
     public static ResourceType miningResourceType;
     public static MapLocation miningWellLoc;
@@ -37,6 +33,8 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
+    private static Random rng;
+
     // scouting vars
     static int startHQID;
     static Direction scoutDir;
@@ -45,25 +43,11 @@ public class Carrier extends Unit {
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
-            for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
-                MapLocation location = Comm.getSpawnQLoc(i);
-                if (location != null && location.equals(rc.getLocation())) {
-                    purpose = Comm.getSpawnQFlag(i);
-                    startHQID = i / 2;
-                    Comm.setSpawnQ(i, -1, -1, 0);
-                    Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
-                    break;
-                }
-            }
-            if (purpose == AWAIT_CMD) {
-                System.out.println("carrier spawn Q broken");
-                purpose = GO_MINE;
-            }
+            rng = new Random(rc.getID());
+            purpose = Comm.getSpawnFlag();
             if (purpose == GO_MINE) {
-                int miningWellIndex = getClosestID(Comm.closestWells[purpose]);
-                miningWellLoc = Comm.closestWells[purpose][miningWellIndex];
-                miningResourceType = ResourceType.values()[purpose];
                 state = MINING;
+                findMineTarget();
             } else {
                 state = SCOUTING;
                 if (purpose == SCOUT_NE) scoutDir = Direction.NORTHEAST;
@@ -171,7 +155,7 @@ public class Carrier extends Unit {
     }
 
     private static boolean shouldStopMining() {
-        if (rc.getWeight() >= MAX_WEIGHT)
+        if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY)
             return true;
         // early game optim, get launcher out asap
         if (rc.getRoundNum() <= 100 && (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 25 || rc.getResourceAmount(ResourceType.MANA) >= 30))
@@ -204,7 +188,7 @@ public class Carrier extends Unit {
                     Direction[] dirs = {forwardDir.rotateRight().rotateRight(), forwardDir.rotateLeft().rotateLeft(),
                             forwardDir.rotateLeft(), forwardDir.rotateRight(), forwardDir};
                     for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
+                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.CARRIER_ATTACK_DIS
                                 && rc.canMove(dir)) {
                             rc.move(dir);
                             assert rc.canAttack(closestEnemy.location);
@@ -409,7 +393,7 @@ public class Carrier extends Unit {
             miningResourceType = ResourceType.ADAMANTIUM;
         } else {
             // Mine AD with 1/3 prob if both mines available
-            miningResourceType = Constants.rng.nextInt(3) == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
+            miningResourceType = rng.nextInt(3) == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
         }
         int miningWellIndex = getClosestID(Comm.closestWells[miningResourceType.resourceID]);
         miningWellLoc = Comm.closestWells[miningResourceType.resourceID][miningWellIndex];

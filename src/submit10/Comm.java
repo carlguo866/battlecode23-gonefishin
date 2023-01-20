@@ -1,9 +1,6 @@
-package launcher_micro.bot1;
+package submit10;
 
-import battlecode.common.GameActionException;
-import battlecode.common.MapLocation;
-import battlecode.common.RobotType;
-import battlecode.common.WellInfo;
+import battlecode.common.*;
 
 /***
  *
@@ -25,23 +22,21 @@ import battlecode.common.WellInfo;
  * 12 bit: coord
  * 4 bit flag
  *
- * enemy report starting bit 336
+ * enemy report starting bit 336 - 359
  * each of:
  * 12 bit: coord
  * 12 bits: last seen round number, could be % 64 later
  *
  * TODO
- * Anchor stuff bit 248
- * 4 bit signifying if each HQ has anchor
- *
  * 35 islands
- * each 12(6) bits for pos, 4 flags for if conquered
+ * each 12(6) bits for pos, 1 bit for if index confirmed, 2 bit for if conquered
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
-    private static final int ENEMY_BIT = 272;
+    private static final int ENEMY_BIT = 336;
+    private static final int ISLAND_BIT = 360;
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -97,11 +92,14 @@ public class Comm extends RobotPlayer {
 
     // this should be called by the setup of each HQ
     public static void HQInit(MapLocation location, int HQID) {
-        // I am assuming HQIDs are < 8, one team using 0/2/4/6 and the other using 1/3/5/7
-        assert(HQID < 8);
-        HQID /= 2;
-        friendlyHQLocations[HQID] = location;
-        writeBits(HQID * 12, 12, loc2int(location));
+        for (int i = 0; i < GameConstants.MAX_STARTING_HEADQUARTERS; i++) {
+            if (friendlyHQLocations[i] == null) {
+                friendlyHQLocations[i] = location;
+                writeBits(i * 12, 12, loc2int(location));
+                return;
+            }
+        }
+        assert false;
     }
 
     private static void updateHQLocations() {
@@ -110,8 +108,8 @@ public class Comm extends RobotPlayer {
             friendlyHQLocations[i] = int2loc(readBits(12 * i, 12));
             if (friendlyHQLocations[i] != null) {
                 // assume the map is rotationally symmetric, FIXME
-                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - friendlyHQLocations[i].x,
-                        rc.getMapHeight() - friendlyHQLocations[i].y);
+                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - friendlyHQLocations[i].x - 1,
+                        rc.getMapHeight() - friendlyHQLocations[i].y - 1);
                 numHQ++;
             }
         }
@@ -158,22 +156,32 @@ public class Comm extends RobotPlayer {
         }
     }
 
-    // spawn Q starts
-    public static MapLocation getSpawnQLoc(int index) {
-        assert index < SPAWN_Q_LENGTH;
-        return int2loc(readBits(SPAWN_Q_BIT + 16 * index, 12));
+    // spawn Q starts, works like a hashtable based on robot location int, collision goes to next pos
+    // can be further optimized to use int directly
+    public static int getSpawnFlag() throws GameActionException {
+        int robotLoc = loc2int(rc.getLocation());
+        for (int i = robotLoc; i < robotLoc + SPAWN_Q_LENGTH; i++) {
+            int val = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16);
+            if ((val >> 4) == robotLoc) {
+                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, 0);
+                commit_write();
+                return val & 0xF;
+            }
+        }
+        return 0;
     }
 
-    public static int getSpawnQFlag(int index) {
-        assert index < SPAWN_Q_LENGTH;
-        return readBits(SPAWN_Q_BIT + 16 * index + 12, 4);
-    }
-
-    // to reset a spawn Q position, set (index, -1, -1, 0)
-    public static void setSpawnQ(int index, int x, int y, int flag) {
-        assert index < SPAWN_Q_LENGTH;
-        writeBits(SPAWN_Q_BIT + index * 16, 12, loc2int(new MapLocation(x, y)));
-        writeBits(SPAWN_Q_BIT + index * 16 + 12, 4, flag);
+    public static boolean trySetSpawnFlag(MapLocation loc, int flag) {
+        int locVal = loc2int(loc);
+        for (int i = locVal; i < locVal + SPAWN_Q_LENGTH; i++) {
+            int oldLoc = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 12);
+            if (oldLoc == 0) {
+                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, (locVal << 4) + flag);
+                return true;
+            }
+        }
+        System.out.println("spawn Q full");
+        return false;
     }
 
     // enemy report starting
@@ -191,6 +199,21 @@ public class Comm extends RobotPlayer {
 
     public static int getEnemyRound() {
         return readBits(ENEMY_BIT + 12, 12);
+    }
+
+    // island storage
+    public static void reportIsland(MapLocation loc, int index) {
+        if (getIslandPos(index) != null)
+            return;
+    }
+
+    // return 0 if not found
+    public static int getNextFreeIslandIndex() {
+        return 0;
+    }
+
+    public static MapLocation getIslandPos(int index) {
+        return null;
     }
 
     // helper funcs

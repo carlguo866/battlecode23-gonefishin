@@ -1,4 +1,4 @@
-package launcher_micro.bot1;
+package submit10;
 
 import battlecode.common.*;
 
@@ -123,6 +123,10 @@ public class Unit extends RobotPlayer {
                 while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateLeft())) {
                     prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();;
                     pathingCnt++;
+                    if (pathingCnt == PRV_LENGTH) {
+                        pathingCnt = 0;
+                        return;
+                    }
                 }
                 Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
                 if (rc.canMove(moveDir)) {
@@ -137,7 +141,7 @@ public class Unit extends RobotPlayer {
     }
 
     static boolean canPass(MapLocation loc) throws GameActionException {
-        if (!rc.senseMapInfo(loc).isPassable() || rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
+        if (!rc.onTheMap(loc) || !rc.senseMapInfo(loc).isPassable() || rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
             return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null && robot.type == RobotType.HEADQUARTERS)

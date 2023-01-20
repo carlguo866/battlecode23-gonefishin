@@ -1,9 +1,6 @@
-package submit8micro.submit8;
+package submit11;
 
-import battlecode.common.GameActionException;
-import battlecode.common.MapLocation;
-import battlecode.common.RobotType;
-import battlecode.common.WellInfo;
+import battlecode.common.*;
 
 /***
  *
@@ -12,36 +9,37 @@ import battlecode.common.WellInfo;
  *
  * Shared array
  * 0-47: 4*2 6bits int specifying the coord of friendly HQs
- * 48-49: 2 bit indicating symmetry of map (0 unknown, 1 rotational, 2 vertial, 3 horizontal)
+ * 48-50: 3 bit whether symmetries of the map have been eliminated:
+ * [ROTATIONAL, VERTIAL, HORIZONTAL]
  *
  * well info 96-203 bits
  * wells info starting bit 96 of 3 types, each 36 bits total 108 bits
  * each type containing 3 coords repping the 3 wells
  * 12 bits: well location
  *
- * spawn queue bit 208 - 335
- * length: 8
- * each of 16 bits, total of 128 bits
+ * spawn queue bit 208 - 463
+ * length: 16
+ * each of 16 bits, total of 256 bits
  * 12 bit: coord
  * 4 bit flag
  *
- * enemy report starting bit 336
+ * enemy report starting bit 464 - 487
  * each of:
  * 12 bit: coord
  * 12 bits: last seen round number, could be % 64 later
  *
  * TODO
- * Anchor stuff bit 248
- * 4 bit signifying if each HQ has anchor
- *
  * 35 islands
- * each 12(6) bits for pos, 4 flags for if conquered
+ * each 12(6) bits for pos, 1 bit for if index confirmed, 2 bit for if conquered
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
+    private static final int SYM_BIT = 48;
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
-    private static final int ENEMY_BIT = 272;
+    private static final int ENEMY_BIT = 487;
+    private static final int ISLAND_BIT = 488;
+
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -53,17 +51,21 @@ public class Comm extends RobotPlayer {
     public static MapLocation[] friendlyHQLocations = {null, null, null, null};
     public static MapLocation[] enemyHQLocations = {null, null, null, null};
 
-    public static int NUM_WELLS = 3; // number of wells stored per resource
+    public static int NUM_WELLS = 5; // number of wells stored per resource
     public static MapLocation[][] closestWells = new MapLocation[4][NUM_WELLS];
 
-    public static final int SPAWN_Q_LENGTH = 8;
+    public static final int SPAWN_Q_LENGTH = 16;
 
     public static void turn_starts() throws GameActionException {
         // TODO only update constant like variable (eg no spawn Q)
+        boolean needSymUpdate = false;
         for (int i = 0; i < ARRAY_LENGTH; i++) {
             if (rc.readSharedArray(i) != buffered_share_array[i]) {
                 if (i >= 6 && i <= 13) {
                     needWellsUpdate = true;
+                }
+                if (i == 3) {
+                    needSymUpdate = true;
                 }
                 buffered_share_array[i] = rc.readSharedArray(i);
             }
@@ -72,6 +74,10 @@ public class Comm extends RobotPlayer {
         if ((turnCount <= 1 && rc.getType() == RobotType.HEADQUARTERS)
                 || (turnCount == 0 && rc.getType() != RobotType.HEADQUARTERS)) {
             updateHQLocations();
+        }
+
+        if (needSymUpdate || turnCount == 0) {
+            updateSym();
         }
 
         if (needWellsUpdate &&
@@ -97,22 +103,44 @@ public class Comm extends RobotPlayer {
 
     // this should be called by the setup of each HQ
     public static void HQInit(MapLocation location, int HQID) {
-        // I am assuming HQIDs are < 8, one team using 0/2/4/6 and the other using 1/3/5/7
-        assert(HQID < 8);
-        HQID /= 2;
-        friendlyHQLocations[HQID] = location;
-        writeBits(HQID * 12, 12, loc2int(location));
+        for (int i = 0; i < GameConstants.MAX_STARTING_HEADQUARTERS; i++) {
+            if (friendlyHQLocations[i] == null) {
+                friendlyHQLocations[i] = location;
+                writeBits(i * 12, 12, loc2int(location));
+                return;
+            }
+        }
+        assert false;
     }
 
-    private static void updateHQLocations() {
+    private static void updateHQLocations() throws GameActionException {
         numHQ = 0;
         for (int i = 0; i < 4; i++) {
             friendlyHQLocations[i] = int2loc(readBits(12 * i, 12));
             if (friendlyHQLocations[i] != null) {
-                // assume the map is rotationally symmetric, FIXME
-                enemyHQLocations[i] = new MapLocation(rc.getMapWidth() - friendlyHQLocations[i].x,
-                        rc.getMapHeight() - friendlyHQLocations[i].y);
                 numHQ++;
+            } else {
+                break;
+            }
+        }
+        if (turnCount == 1 && rc.getType() == RobotType.HEADQUARTERS && !isSymmetryConfirmed) {
+            for (int i = numHQ; --i >= 0;) {
+                for (int sym = 3; --sym >= 0;) {
+                    if (isSymEliminated[sym])
+                        continue;
+                    MapLocation loc = friendlyHQLocations[i];
+                    MapLocation symLoc = new MapLocation(
+                            (sym & 1) == 0? mapWidth - loc.x - 1 : loc.x,
+                            (sym & 2) == 0? mapHeight - loc.y - 1 : loc.y);
+                    if (!rc.canSenseLocation(symLoc)) continue;
+                    RobotInfo robot = rc.senseRobotAtLocation(symLoc);
+                    if (robot == null || robot.type != RobotType.HEADQUARTERS || robot.team != oppTeam) {
+                        isSymEliminated[sym] = true;
+                        writeBits(SYM_BIT + sym, 1, 1);
+                        System.out.printf("eliminate sym %d from HQ at %s\n", sym, loc);
+                        guessSym();
+                    }
+                }
             }
         }
     }
@@ -158,22 +186,32 @@ public class Comm extends RobotPlayer {
         }
     }
 
-    // spawn Q starts
-    public static MapLocation getSpawnQLoc(int index) {
-        assert index < SPAWN_Q_LENGTH;
-        return int2loc(readBits(SPAWN_Q_BIT + 16 * index, 12));
+    // spawn Q starts, works like a hashtable based on robot location int, collision goes to next pos
+    // can be further optimized to use int directly
+    public static int getSpawnFlag() throws GameActionException {
+        int robotLoc = loc2int(rc.getLocation());
+        for (int i = robotLoc; i < robotLoc + SPAWN_Q_LENGTH; i++) {
+            int val = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16);
+            if ((val >> 4) == robotLoc) {
+                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, 0);
+                commit_write();
+                return val & 0xF;
+            }
+        }
+        return 0;
     }
 
-    public static int getSpawnQFlag(int index) {
-        assert index < SPAWN_Q_LENGTH;
-        return readBits(SPAWN_Q_BIT + 16 * index + 12, 4);
-    }
-
-    // to reset a spawn Q position, set (index, -1, -1, 0)
-    public static void setSpawnQ(int index, int x, int y, int flag) {
-        assert index < SPAWN_Q_LENGTH;
-        writeBits(SPAWN_Q_BIT + index * 16, 12, loc2int(new MapLocation(x, y)));
-        writeBits(SPAWN_Q_BIT + index * 16 + 12, 4, flag);
+    public static boolean trySetSpawnFlag(MapLocation loc, int flag) {
+        int locVal = loc2int(loc);
+        for (int i = locVal; i < locVal + SPAWN_Q_LENGTH; i++) {
+            int oldLoc = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 12);
+            if (oldLoc == 0) {
+                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, (locVal << 4) | flag);
+                return true;
+            }
+        }
+        System.out.println("spawn Q full");
+        return false;
     }
 
     // enemy report starting
@@ -191,6 +229,90 @@ public class Comm extends RobotPlayer {
 
     public static int getEnemyRound() {
         return readBits(ENEMY_BIT + 12, 12);
+    }
+
+    // island storage
+    public static void reportIsland(MapLocation loc, int index) {
+        if (getIslandPos(index) != null)
+            return;
+    }
+
+    // return 0 if not found
+    public static int getNextFreeIslandIndex() {
+        return 0;
+    }
+
+    public static MapLocation getIslandPos(int index) {
+        return null;
+    }
+
+    // symmetry checker
+    // bit 0-2: whether sym is eliminated
+    public static final int SYM_ROTATIONAL = 0;
+    public static final int SYM_VERTIAL = 1;
+    public static final int SYM_HORIZONTAL = 2;
+
+    public static int symmetry;
+    public static boolean isSymmetryConfirmed;
+    public static boolean needSymmetryReport;
+    public static boolean[] isSymEliminated = new boolean[3];
+
+    public static void eliminateSym(int sym) throws GameActionException {
+        isSymEliminated[sym] = true;
+        if (rc.canWriteSharedArray(0, 0)) {
+            writeBits(SYM_BIT + sym, 1, 1);
+            commit_write();
+        } else {
+            needSymmetryReport = true;
+        }
+        guessSym();
+    }
+
+    public static void updateSym() {
+        int bits = readBits(SYM_BIT, 3);
+        needSymmetryReport = false;
+        for (int sym = 3; --sym >= 0; ) {
+            if (!isSymEliminated[sym] && (bits & (1 << (2 - sym))) > 0) {
+                isSymEliminated[sym] = true;
+            } else if (isSymEliminated[sym] && (bits & (1 << (2 - sym))) == 0) {
+                needSymmetryReport = true;
+            }
+        }
+        guessSym();
+    }
+
+    public static void reportSym() throws GameActionException {
+        if (!needSymmetryReport)
+            return;
+        int bits = readBits(SYM_BIT, 3);
+        for (int sym = 3; --sym >= 0; ) {
+            if (isSymEliminated[sym] && (bits & (1 << (2 - sym))) == 0) {
+                writeBits(SYM_BIT + sym, 1, 1);
+            }
+        }
+    }
+
+    public static void guessSym() {
+        int numPossible = 0;
+        for (int sym = 3; --sym >=0; ) {
+            if (!isSymEliminated[sym]) {
+                numPossible++;
+                symmetry = sym;
+            }
+        }
+        assert numPossible > 0;
+        if (numPossible == 1) {
+            isSymmetryConfirmed = true;
+        } else {
+            isSymmetryConfirmed = false;
+        }
+        // update enemy HQ loc
+        for (int i = numHQ; --i >= 0;) {
+            MapLocation loc = friendlyHQLocations[i];
+            enemyHQLocations[i] = new MapLocation(
+                    (symmetry & 1) == 0? mapWidth - loc.x - 1 : loc.x,
+                    (symmetry & 2) == 0? mapHeight - loc.y - 1 : loc.y);
+        }
     }
 
     // helper funcs

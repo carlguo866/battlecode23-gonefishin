@@ -1,4 +1,4 @@
-package bot1;
+package submit10;
 
 import battlecode.common.*;
 
@@ -147,7 +147,7 @@ public class Launcher extends Unit {
                         indicator += String.format("M2E@%s", enemyLocation);
                     }
                 } else
-                if (dis >= 9 && friendlyLauncherCnt <= 3) {
+                if (dis >= 4 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
@@ -155,7 +155,7 @@ public class Launcher extends Unit {
                 } else {
                     if (rc.getRoundNum() <= 26) {
                         // first few turns move toward center of the map
-                        moveToward(new MapLocation(mapWidth/2, mapHeight/2));
+                        moveToward(new MapLocation(rc.getMapWidth()/2, rc.getMapHeight()/2));
                     } else {
                         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
                         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
@@ -167,7 +167,6 @@ public class Launcher extends Unit {
                                 }
                             }
                         }
-                        enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
                         indicator += String.format("M2EHQ@%s", enemyHQLoc);
                         moveToward(enemyHQLoc);
                     }

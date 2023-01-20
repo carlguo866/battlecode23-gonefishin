@@ -1,9 +1,9 @@
-package bot1;
+package submit11;
 
 import battlecode.common.*;
+import submit11.util.FastIterableLocSet;
 
 import java.util.Random;
-import bot1.util.FastIterableLocSet;
 
 public class Carrier extends Unit {
     // purposes
@@ -109,6 +109,15 @@ public class Carrier extends Unit {
         if (purpose != SCOUT_SYMMETRY) {
             MapRecorder.recordFast(500);
         }
+    }
+
+    private static boolean shouldStopMining() {
+        if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY)
+            return true;
+        // early game optim, get launcher out asap
+        if (rc.getRoundNum() <= 100 && (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 25 || rc.getResourceAmount(ResourceType.MANA) >= 30))
+            return true;
+        return false;
     }
 
     // sense and attack nearby enemies
@@ -346,7 +355,7 @@ public class Carrier extends Unit {
     }
 
     private static void mine() throws GameActionException {
-        if (rc.getWeight() < GameConstants.CARRIER_CAPACITY) {
+        if (shouldStopMining()) {
             int hqid = getClosestID(Comm.friendlyHQLocations);
             miningHQLoc = Comm.friendlyHQLocations[hqid];
             state = DROPPING_RESOURCE;

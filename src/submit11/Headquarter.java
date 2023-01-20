@@ -1,4 +1,4 @@
-package bot1;
+package submit11;
 
 import battlecode.common.*;
 

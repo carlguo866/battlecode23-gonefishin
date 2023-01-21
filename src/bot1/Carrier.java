@@ -33,7 +33,7 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
-    public static FastIterableLocSet congestedMines = new FastIterableLocSet(400);
+    public static FastIterableLocSet congestedMines = new FastIterableLocSet(290);
     public static FastLocIntMap lastEnemyOnMine = new FastLocIntMap();
     private static Random rng;
 
@@ -231,6 +231,7 @@ public class Carrier extends Unit {
         lastSenseLocation = rc.getLocation();
         for (WellInfo well : rc.senseNearbyWells()) {
             if (!wellsSeen[well.getResourceType().resourceID].contains(well.getMapLocation())) {
+                // TODO need to check if need to report, o.w. report set may index out of bound
                 wellsSeen[well.getResourceType().resourceID].add(well.getMapLocation());
                 wellsToReport[well.getResourceType().resourceID].add(well.getMapLocation());
             }
@@ -271,7 +272,7 @@ public class Carrier extends Unit {
             }
         }
 
-        if (purpose == SCOUT_SYMMETRY && (rc.getRoundNum() - scoutStartRound >= 30 || scoutTarget == null)) {
+        if (purpose == SCOUT_SYMMETRY && (rc.getRoundNum() - scoutStartRound >= 70 || scoutTarget == null)) {
             // if I have been scouting for 30 turns consecutively and everything the same, it really doesn't matter
             System.out.println("sym scout too long, eliminate sym arbitrarily");
             for (int sym = 2; sym >= 0 && !Comm.isSymmetryConfirmed; sym--) {

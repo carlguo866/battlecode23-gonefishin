@@ -128,50 +128,33 @@ public class Launcher extends Unit {
         sense();
         micro();
         if (closestEnemy == null) { // macro
-            // the launcher with the smallest ID is the master, everyone follows him
-            if (masterLauncher != null) {
-                indicator += String.format("Following master %d at %s", masterLauncher.getID(), masterLauncher.location);
-                follow(masterLauncher.location);
-            } else { // I am the master
-                // If enemy reported recently that is close
-                MapLocation enemyLocation = Comm.getEnemyLoc();
-                if (enemyLocation != null
-                        && rc.getRoundNum() - Comm.getEnemyRound() <= 50
-                        && Comm.getEnemyRound() > clearedUntilRound
-                        && rc.getLocation().distanceSquaredTo(enemyLocation) <= 64) {
-                    if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
-                        // enemy has been cleared
-                        clearedUntilRound = rc.getRoundNum();
-                    } else {
-                        moveToward(enemyLocation);
-                        indicator += String.format("M2E@%s", enemyLocation);
-                    }
-                } else
-                if (dis >= 9 && friendlyLauncherCnt <= 3) {
-                    // if there is a launcher going far away while there are few launchers,
-                    // most likely it has seen something, follow him
-                    indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
-                    follow(furthestFriendlyLauncher.location);
+            // If enemy reported recently that is close
+            MapLocation enemyLocation = Comm.getEnemyLoc();
+            if (enemyLocation != null
+                    && rc.getRoundNum() - Comm.getEnemyRound() <= 50
+                    && Comm.getEnemyRound() > clearedUntilRound
+                    && rc.getLocation().distanceSquaredTo(enemyLocation) <= 64) {
+                if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
+                    // enemy has been cleared
+                    clearedUntilRound = rc.getRoundNum();
                 } else {
-                    if (rc.getRoundNum() <= 26) {
-                        // first few turns move toward center of the map
-                        moveToward(new MapLocation(mapWidth/2, mapHeight/2));
-                    } else {
-                        // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
-                        if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
-                            for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
-                                if (Comm.enemyHQLocations[i % 4] != null) {
-                                    enemyHQID = i % 4;
-                                    enemyHQLoc = Comm.enemyHQLocations[i % 4];
-                                    break;
-                                }
-                            }
+                    moveToward(enemyLocation);
+                    indicator += String.format("M2E@%s", enemyLocation);
+                }
+            } else {
+                // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
+                if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
+                    for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
+                        if (Comm.enemyHQLocations[i % 4] != null) {
+                            enemyHQID = i % 4;
+                            enemyHQLoc = Comm.enemyHQLocations[i % 4];
+                            break;
                         }
-                        enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
-                        indicator += String.format("M2EHQ@%s", enemyHQLoc);
-                        moveToward(enemyHQLoc);
                     }
                 }
+                enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
+                indicator += String.format("M2EHQ@%s", enemyHQLoc);
+                moveToward(enemyHQLoc);
             }
         }
         sense();

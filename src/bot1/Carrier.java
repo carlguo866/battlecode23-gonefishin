@@ -390,6 +390,7 @@ public class Carrier extends Unit {
                     }
                 }
                 if (moveLoc != null) {
+                    indicator += String.format("empty%s curv%d co %d", moveLoc, MapRecorder.vals[moveLoc.x][moveLoc.y] & MapRecorder.CURRENT_MASK, rc.senseMapInfo(moveLoc).getCurrentDirection().ordinal());
                     rc.move(rc.getLocation().directionTo(moveLoc));
                 }
             } else if (rc.canMove(dirToMine)) {

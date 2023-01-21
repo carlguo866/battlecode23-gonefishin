@@ -175,15 +175,7 @@ public class Launcher extends Unit {
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
-            // reset the spawn flag
-            for (int i = 0; i < Comm.SPAWN_Q_LENGTH; i++) {
-                MapLocation location = Comm.getSpawnQLoc(i);
-                if (location != null && location.compareTo(rc.getLocation()) == 0) {
-                    int purpose = Comm.getSpawnQFlag(i);
-                    Comm.setSpawnQ(i, -1, -1, 0);
-                    Comm.commit_write(); // write immediately instead of at turn ends in case we move out of range
-                }
-            }
+            // future: get from spawn queue if there are more than one roles
             // prioritize the closest enemy HQ
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
@@ -192,6 +184,7 @@ public class Launcher extends Unit {
             // first two rounds just wait for the other two to join and move together
             return;
         }
+
 
         sense();
         micro();
@@ -214,16 +207,16 @@ public class Launcher extends Unit {
                         moveToward(enemyLocation);
                         indicator += String.format("M2E@%s", enemyLocation);
                     }
-                } else if (dis >= 4 && friendlyLaunchers.size() <= 3) {
+                } else
+                if (dis >= 9 && friendlyLaunchers.size() <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
                     follow(furthestFriendlyLauncher.location);
-//                } else {
                 } else {
                     if (rc.getRoundNum() <= 26) {
                         // first few turns move toward center of the map
-                        moveToward(new MapLocation(rc.getMapWidth()/2, rc.getMapHeight()/2));
+                        moveToward(new MapLocation(mapWidth/2, mapHeight/2));
                     } else {
                         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
                         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
@@ -235,6 +228,7 @@ public class Launcher extends Unit {
                                 }
                             }
                         }
+                        enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
                         indicator += String.format("M2EHQ@%s", enemyHQLoc);
                         moveToward(enemyHQLoc);
                     }
@@ -283,14 +277,10 @@ public class Launcher extends Unit {
             }
 
             int canAttackFriends = 0;
-//            int canSeeFriends = 0;
             for (RobotInfo friend: friendlyLaunchers){
                 if (friend.location.distanceSquaredTo(target.location) <= ATTACK_DIS){
                     canAttackFriends+=1;
                 }
-//                if (friend.location.distanceSquaredTo(target.location) <= VISION_DIS){
-//                    canSeeFriends+=1;
-//                }
             }
             if (target == enemy) {
                 maxCanAttackFriends = canAttackFriends;

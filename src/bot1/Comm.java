@@ -156,12 +156,13 @@ public class Comm extends RobotPlayer {
                 closestWells[resourceID][i] = int2loc(readBits(startingBit, 12));
             }
         }
+        if (rc.getType() == RobotType.CARRIER && turnCount != 0) {
+            Carrier.updateWells();
+        }
         needWellsUpdate = false;
     }
 
-    public static void reportWells(WellInfo well) {
-        MapLocation wellLocation = well.getMapLocation();
-        int resourceID = well.getResourceType().resourceID;
+    public static void reportWells(int resourceID, MapLocation wellLocation) {
         int closestHQID = Unit.getClosestID(wellLocation, friendlyHQLocations);
         int maxDis = friendlyHQLocations[closestHQID].distanceSquaredTo(wellLocation);
 
@@ -171,7 +172,7 @@ public class Comm extends RobotPlayer {
                 updateIndex = i;
                 break;
             }
-            if (closestWells[resourceID][i].equals(well.getMapLocation())){
+            if (closestWells[resourceID][i].equals(wellLocation)){
                 return;
             }
             int original_dis = Unit.getClosestDis(closestWells[resourceID][i], friendlyHQLocations);

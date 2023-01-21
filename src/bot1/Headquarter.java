@@ -10,7 +10,7 @@ public class Headquarter extends Unit {
             // first turn all HQ report
             Comm.HQInit(rc.getLocation(), rc.getID());
             for (WellInfo well : rc.senseNearbyWells()) {
-                Comm.reportWells(well);
+                Comm.reportWells(well.getResourceType().resourceID, well.getMapLocation());
             }
             if (Comm.friendlyHQLocations[0].equals(rc.getLocation())) {
                 trySpawn(RobotType.CARRIER, rc.getLocation(), Carrier.SCOUT_SYMMETRY);

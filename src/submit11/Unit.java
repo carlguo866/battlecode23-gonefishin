@@ -236,7 +236,7 @@ public class Unit extends RobotPlayer {
             lasttarget = location;
             bestMetric = newmetric;
         }
-        else if (newmetric >= bestMetric) {
+        if (newmetric > bestMetric) {
             target = target2;
         }
         //System.out.println("$$$$$$$");

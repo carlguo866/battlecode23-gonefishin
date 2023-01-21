@@ -1,10 +1,10 @@
-package bot1;
+package submit13;
 
 import battlecode.common.*;
+import submit13.util.FastIterableLocSet;
+import submit13.util.FastLocIntMap;
 
 import java.util.Random;
-import bot1.util.FastIterableLocSet;
-import bot1.util.FastLocIntMap;
 
 public class Carrier extends Unit {
     // purposes
@@ -33,7 +33,7 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
-    public static FastIterableLocSet congestedMines = new FastIterableLocSet(290);
+    public static FastIterableLocSet congestedMines = new FastIterableLocSet(400);
     public static FastLocIntMap lastEnemyOnMine = new FastLocIntMap();
     private static Random rng;
 
@@ -44,16 +44,11 @@ public class Carrier extends Unit {
     static MapLocation scoutTarget = null;
     static MapLocation scoutCenter = null;
     static double scoutAngle = 0;
-    static FastIterableLocSet[] wellsSeen = {null, null, null};
-    static FastIterableLocSet[] wellsToReport = {null, null, null};
+    static WellInfo[] wellsToReport = new WellInfo[300];
+    static int wellReportCnt = 0, wellSeenCnt = 0;
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
-            wellsSeen[ResourceType.MANA.resourceID] = new FastIterableLocSet(145);
-            wellsSeen[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(145);
-            wellsToReport[ResourceType.MANA.resourceID] = new FastIterableLocSet(10);
-            wellsToReport[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(10);
-
             startHQID = getClosestID(Comm.friendlyHQLocations);
             startHQLoc = Comm.friendlyHQLocations[startHQID];
             scoutCenter = startHQLoc;
@@ -64,7 +59,6 @@ public class Carrier extends Unit {
                 purpose = MINE_MN;
                 System.out.println("Carrier spawn Q no flag");
             }
-            updateWells();
             resumeWork();
         }
 
@@ -198,7 +192,7 @@ public class Carrier extends Unit {
         int[] islands = rc.senseNearbyIslands();
         if (rc.canPlaceAnchor()) {
             rc.placeAnchor();
-            tryFindMine();
+            state = MINING;
             return;
         }
         MapLocation targetLoc = null;
@@ -230,10 +224,24 @@ public class Carrier extends Unit {
             return;
         lastSenseLocation = rc.getLocation();
         for (WellInfo well : rc.senseNearbyWells()) {
-            if (!wellsSeen[well.getResourceType().resourceID].contains(well.getMapLocation())) {
-                // TODO need to check if need to report, o.w. report set may index out of bound
-                wellsSeen[well.getResourceType().resourceID].add(well.getMapLocation());
-                wellsToReport[well.getResourceType().resourceID].add(well.getMapLocation());
+            boolean seenWell = false;
+            for (int i = 0; i < wellSeenCnt; i++) {
+                // FIXME inefficient
+                if (wellsToReport[i].getMapLocation() == well.getMapLocation()) {
+                    seenWell = true;
+                    break;
+                }
+            }
+            for (int i = 0; i < Comm.NUM_WELLS; i++) {
+                if (Comm.closestWells[well.getResourceType().resourceID][i] == null)
+                    break;
+                if (Comm.closestWells[well.getResourceType().resourceID][i].equals(well.getMapLocation())) {
+                    seenWell = true;
+                    break;
+                }
+            }
+            if (!seenWell) {
+                wellsToReport[wellSeenCnt++] = well;
             }
         }
     }
@@ -254,43 +262,37 @@ public class Carrier extends Unit {
     }
 
     private static void scoutMove() throws GameActionException {
-        if (purpose == SCOUT_SYMMETRY && Comm.isSymmetryConfirmed) {
-            state = REPORTING_INFO;
-            return;
-        }
-
-        if ((purpose == MINE_AD || purpose == MINE_MN) && tryFindMine()) {
-            state = REPORTING_INFO;
-            return;
-        }
-
-        if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
-            if (!setScoutTarget() && purpose != SCOUT_SYMMETRY) {
-                System.out.println("miner out of mine after exploring map, disintegrate");
-                rc.disintegrate();
-                return;
-            }
-        }
-
-        if (purpose == SCOUT_SYMMETRY && (rc.getRoundNum() - scoutStartRound >= 70 || scoutTarget == null)) {
+        if (purpose == SCOUT_SYMMETRY && rc.getRoundNum() - scoutStartRound >= 30) {
             // if I have been scouting for 30 turns consecutively and everything the same, it really doesn't matter
             System.out.println("sym scout too long, eliminate sym arbitrarily");
             for (int sym = 2; sym >= 0 && !Comm.isSymmetryConfirmed; sym--) {
                 Comm.eliminateSym(sym);
             }
+        }
+
+        if (purpose == SCOUT_SYMMETRY && Comm.isSymmetryConfirmed) {
             state = REPORTING_INFO;
             return;
         }
 
+        if ((purpose == MINE_AD || purpose == MINE_MN) && !needScoutWell()) {
+            state = REPORTING_INFO;
+            return;
+        }
+
+        if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
+            if (!setScoutTarget()) {
+                System.out.println("nothing to scout");
+                state = 0;
+                return;
+            }
+        }
         indicator += String.format("T%s,A%.1fPI,v%d", scoutTarget, scoutAngle / Math.PI, MapRecorder.vals[scoutTarget.x][scoutTarget.y]);
         moveToward(scoutTarget);
     }
 
     private static boolean isNeedReport() {
-        return lastEnemyRound > (Comm.getEnemyRound() + 2)
-                || wellsToReport[ResourceType.ADAMANTIUM.resourceID].size > 0
-                || wellsToReport[ResourceType.MANA.resourceID].size > 0
-                || Comm.needSymmetryReport;
+        return lastEnemyRound > (Comm.getEnemyRound() + 2) || wellReportCnt < wellSeenCnt || Comm.needSymmetryReport;
     }
 
     private static void report() throws GameActionException {
@@ -298,15 +300,8 @@ public class Carrier extends Unit {
         if (lastEnemyLoc != null) {
             Comm.reportEnemy(lastEnemyLoc, lastEnemyRound);
         }
-        for (int resource = 1; resource <= 2; resource++) {
-            if (wellsToReport[resource].size > 0) {
-                wellsToReport[resource].updateIterable();
-                for (int i = wellsToReport[resource].size; --i >= 0;) {
-                    Comm.reportWells(resource, wellsToReport[resource].locs[i]);
-                }
-                wellsToReport[resource].clear();
-            }
-        }
+        while(wellReportCnt < wellSeenCnt)
+            Comm.reportWells(wellsToReport[wellReportCnt++]);
         Comm.reportSym();
         Comm.commit_write();
     }
@@ -391,7 +386,6 @@ public class Carrier extends Unit {
                     }
                 }
                 if (moveLoc != null) {
-                    indicator += String.format("empty%s curv%d co %d", moveLoc, MapRecorder.vals[moveLoc.x][moveLoc.y] & MapRecorder.CURRENT_MASK, rc.senseMapInfo(moveLoc).getCurrentDirection().ordinal());
                     rc.move(rc.getLocation().directionTo(moveLoc));
                 }
             } else if (rc.canMove(dirToMine)) {
@@ -417,9 +411,7 @@ public class Carrier extends Unit {
             if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= MapRecorder.getMinableSquares(miningWellLoc).size - 1) {
                 indicator += "congest";
                 congestedMines.add(miningWellLoc);
-                if (!tryFindMine()) {
-                    return;
-                }
+                tryFindMine();
             }
             moveToward(miningWellLoc);
             moveToward(miningWellLoc);
@@ -444,71 +436,76 @@ public class Carrier extends Unit {
             }
             if (rc.getWeight() == 0) {
                 congestedMines.clear();
-                if (tryFindMine()) {
-                    mine();
-                }
+                state = MINING;
+                tryFindMine();
+                mine();
             }
         }
     }
 
-    // this func transitions into either mining or scouting and returns true if the transition is to mining
-    private static boolean tryFindMine() {
-        miningWellLoc = null;
-        MapLocation congestedLocation = null;
-        MapLocation dangerLocation = null;
-        boolean enemySeen = false;
-        wellsSeen[miningResourceType.resourceID].updateIterable();
-        for (int i = wellsSeen[miningResourceType.resourceID].size; --i >= 0;) {
-            MapLocation loc = wellsSeen[miningResourceType.resourceID].locs[i];
-
-            // for the first 15 rounds, we ignore wells too far away from starting HQ to encourage carrier
-            // to scout around base first
-            if (rc.getRoundNum() <= 15 && loc.distanceSquaredTo(startHQLoc) > 100) {
-                continue;
-            }
-
-            if (congestedMines.contains(loc)) {
-                // congested mines are backups in case there have been enemies seen
-                if (congestedLocation == null
-                        || congestedLocation.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
-                    congestedLocation = loc;
-                }
-                continue;
-            }
-
-            int enemyRound = lastEnemyOnMine.getVal(loc);
-            if (enemyRound != -1 && rc.getRoundNum() - enemyRound <= 60) {
-                // if enemies recently seen at this location, it would be dangerous to go again
-                if (dangerLocation == null || lastEnemyOnMine.getVal(dangerLocation) > enemyRound) {
-                    dangerLocation = loc;
-                }
-                // if enemies are seen congestion probably should be reset
-                congestedMines.clear();
-                enemySeen = true;
-            } else {
-                // find the closest mine to robot
-                if (miningWellLoc == null
-                        || miningWellLoc.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
-                    miningWellLoc = loc;
-                }
-            }
-        }
-
-        if (miningWellLoc == null && enemySeen) {
-            if (congestedLocation != null) {
-                miningWellLoc = congestedLocation;
-            } else if (dangerLocation != null) {
-                miningWellLoc = dangerLocation;
-            }
-        }
-        if (miningWellLoc == null) {
+    private static void tryFindMine() {
+        if (needScoutWell()) {
             state = SCOUTING;
             scoutStartRound = rc.getRoundNum();
-            return false;
         } else {
+            miningWellLoc = null;
+            MapLocation congestedLocation = null;
+            MapLocation dangerLocation = null;
+            for (int i = 0; i < Comm.NUM_WELLS; i++) {
+                MapLocation loc = Comm.closestWells[miningResourceType.resourceID][i];
+                if (loc == null)
+                    break;
+                if (congestedMines.contains(loc)) {
+                    // congested mines are backups
+                    if (congestedLocation == null
+                            || congestedLocation.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
+                        congestedLocation = loc;
+                    }
+                    continue;
+                }
+
+                int enemyRound = lastEnemyOnMine.getVal(loc);
+                if (enemyRound != -1 && rc.getRoundNum() - enemyRound <= 60) {
+                    // if enemies last reported at this location, it could only be considered as backup
+                    // we choose backup based on last enemy seen
+                    if (dangerLocation == null || lastEnemyOnMine.getVal(dangerLocation) > enemyRound) {
+                        dangerLocation = loc;
+                    }
+                    // if enemies are seen congestion is much less a concern
+                    congestedMines.clear();
+                } else {
+                    if (miningWellLoc == null
+                            || miningWellLoc.distanceSquaredTo(rc.getLocation()) > loc.distanceSquaredTo(rc.getLocation())) {
+                        miningWellLoc = loc;
+                    }
+                }
+            }
+            if (miningWellLoc == null) {
+                if (congestedLocation != null) {
+                    miningWellLoc = congestedLocation;
+                } else if (dangerLocation != null) {
+                    miningWellLoc = dangerLocation;
+                } else {
+                        System.out.printf("all resource of type %s congested, disintegrate", miningResourceType);
+                        rc.disintegrate();
+                }
+            }
             state = MINING;
-            return true;
         }
+    }
+
+    private static boolean needScoutWell() {
+        // if we find a well of the required type we stop
+        for (int i = wellReportCnt; i < wellSeenCnt; i++) {
+            if (wellsToReport[i].getResourceType() == miningResourceType)
+                return false;
+        }
+        if (Comm.closestWells[miningResourceType.resourceID][0] == null)
+            return true;
+        // for the first 15 turns we wanna scout around base if no well is found around
+        if (rc.getRoundNum() <= 15 && getClosestDis(Comm.closestWells[miningResourceType.resourceID]) > 64)
+            return true;
+        return false;
     }
 
     // after reporting info or running away
@@ -526,18 +523,6 @@ public class Carrier extends Unit {
                 state = SCOUTING;
                 scoutCenter = new MapLocation(mapWidth / 2, mapHeight / 2);
                 scoutStartRound = rc.getRoundNum();
-            }
-        }
-    }
-
-    public static void updateWells() {
-        for (int resource = 1; resource <= 2; resource++) {
-            for (int i = 0; i < Comm.NUM_WELLS; i++) {
-                if (Comm.closestWells[resource][i] != null) {
-                    wellsSeen[resource].add(Comm.closestWells[resource][i]);
-                } else {
-                    break;
-                }
             }
         }
     }

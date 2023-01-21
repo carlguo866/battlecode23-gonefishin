@@ -1,7 +1,7 @@
-package bot1;
+package submit13;
 
 import battlecode.common.*;
-import bot1.util.FastIterableLocSet;
+import submit13.util.FastIterableLocSet;
 
 public class MapRecorder extends RobotPlayer {
     // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting
@@ -80,7 +80,7 @@ public class MapRecorder extends RobotPlayer {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
                 return;
             }
-            vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = (infos[i].isPassable()? (SEEN_BIT | PASSIABLE_BIT) : SEEN_BIT) | infos[i].getCurrentDirection().ordinal();
+            vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = (infos[i].isPassable()? SEEN_BIT : (SEEN_BIT | PASSIABLE_BIT)) | infos[i].getCurrentDirection().ordinal();
         }
     }
 
@@ -96,13 +96,12 @@ public class MapRecorder extends RobotPlayer {
             if ((val & SEEN_BIT) == 0) {
                 set.add(loc);
             } else {
-                if ((val & PASSIABLE_BIT) == 0) {
+                if ((val & PASSIABLE_BIT) != 0)
                     continue;
-                }
                 Direction dir = Direction.values()[val & CURRENT_MASK];
                 MapLocation blowInto = loc.add(dir);
                 if (blowInto.isAdjacentTo(mineLoc) ||
-                        (rc.onTheMap(blowInto) && (vals[blowInto.x][blowInto.y] & PASSIABLE_BIT) == 0 && (vals[blowInto.x][blowInto.y] & SEEN_BIT) != 0)) {
+                        (rc.onTheMap(blowInto) && (vals[blowInto.x][blowInto.y] & PASSIABLE_BIT) == 0)) {
                     set.add(loc);
                 }
             }

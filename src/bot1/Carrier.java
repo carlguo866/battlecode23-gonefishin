@@ -102,7 +102,7 @@ public class Carrier extends Unit {
         }
 
         if (state == MINING) {
-            mine();
+            handleMiningState();
         }
 
         if (state == DROPPING_RESOURCE) {
@@ -360,58 +360,58 @@ public class Carrier extends Unit {
         }
     }
 
-    private static void mine() throws GameActionException {
+    // when next to mine
+    private static void collect() throws GameActionException {
+        int hqid = getClosestID(Comm.friendlyHQLocations);
+        miningHQLoc = Comm.friendlyHQLocations[hqid];
+        // may be able to collect twice per turn
+        if (rc.canCollectResource(miningWellLoc, -1)) {
+            rc.collectResource(miningWellLoc, -1);
+        }
+        if (rc.canCollectResource(miningWellLoc, -1)) {
+            rc.collectResource(miningWellLoc, -1);
+        }
         if (rc.getWeight() >= GameConstants.CARRIER_CAPACITY) {
-            int hqid = getClosestID(Comm.friendlyHQLocations);
-            miningHQLoc = Comm.friendlyHQLocations[hqid];
             state = DROPPING_RESOURCE;
-        } else if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
-            // may be able to collect twice per turn
-            if (rc.canCollectResource(miningWellLoc, -1)) {
-                rc.collectResource(miningWellLoc, -1);
+            return;
+        }
+        indicator += "mine,";
+        // move in pattern to allow others miners to join and other units to pass the mine
+        if (!rc.isMovementReady()) {
+            return;
+        }
+        FastIterableLocSet minableLocs = MapRecorder.getMinableSquares(miningWellLoc);
+        minableLocs.updateIterable();
+        // sense if there are teammates next to me that I need to let in
+        boolean teammateAdjacent = false;
+        for (RobotInfo robot: rc.senseNearbyRobots(rc.getLocation(), 3, myTeam)) {
+            if (!minableLocs.contains(robot.location) && robot.getResourceAmount(ResourceType.MANA) + robot.getResourceAmount(ResourceType.ADAMANTIUM) < 39) {
+                teammateAdjacent = true;
             }
-            if (rc.canCollectResource(miningWellLoc, -1)) {
-                rc.collectResource(miningWellLoc, -1);
-            }
-            indicator += "mine,";
-            // move in pattern to allow others to join
-            Direction dirToMine = rc.getLocation().directionTo(miningWellLoc);
-            if (dirToMine == Direction.CENTER && rc.isMovementReady()) {
-                int hqid = getClosestID(Comm.friendlyHQLocations);
-                miningHQLoc = Comm.friendlyHQLocations[hqid];
-                // robot in the center moves away to the closest minable square to home HQ
-                FastIterableLocSet set = MapRecorder.getMinableSquares(miningWellLoc);
-                set.updateIterable();
-                MapLocation moveLoc = null;
-                for (int i = set.size; --i >= 0;) {
-                    if (!set.locs[i].equals(miningWellLoc) && rc.canMove(rc.getLocation().directionTo(set.locs[i]))) {
-                        if (moveLoc == null || miningHQLoc.distanceSquaredTo(moveLoc) > miningHQLoc.distanceSquaredTo(set.locs[i])) {
-                            moveLoc = set.locs[i];
-                        }
-                    }
-                }
-                if (moveLoc != null) {
-                    indicator += String.format("empty%s curv%d co %d", moveLoc, MapRecorder.vals[moveLoc.x][moveLoc.y] & MapRecorder.CURRENT_MASK, rc.senseMapInfo(moveLoc).getCurrentDirection().ordinal());
-                    rc.move(rc.getLocation().directionTo(moveLoc));
-                }
-            } else if (rc.canMove(dirToMine)) {
-                // robot with the least resource go to the center of the mine
-                // or if I sensed a carrier waiting to get in adjacent to, I move to center
-                boolean leastResource = true;
-                boolean teammateAdjacent = false;
-                for (RobotInfo robot: rc.senseNearbyRobots(miningWellLoc, 8, myTeam)) {
-                    if (robot.location.isAdjacentTo(miningWellLoc)) {
-                        if (robot.getResourceAmount(ResourceType.MANA) + robot.getResourceAmount(ResourceType.ADAMANTIUM) < rc.getWeight()) {
-                            leastResource = false;
-                        }
-                    } else if (robot.location.isAdjacentTo(rc.getLocation()) && robot.getResourceAmount(ResourceType.MANA) + robot.getResourceAmount(ResourceType.ADAMANTIUM) < 39) {
-                        teammateAdjacent = true;
-                    }
-                }
-                if (leastResource || teammateAdjacent) {
-                    rc.move(dirToMine);
+        }
+        // try to find the best mineable square that I can move to,
+        // carrier with a lot of resources will only move if the new position is closer to base
+        // or there are people waiting to be let in every 5 turns (so allow less resource robot to empty space first)
+        MapLocation moveLoc = (rc.getWeight() > 30 && !teammateAdjacent && rc.getRoundNum() % 5 == 0) ?
+                rc.getLocation() : null;
+        for (int i = minableLocs.size; --i >= 0;) {
+            if (minableLocs.locs[i].isAdjacentTo(rc.getLocation())
+                    && rc.canMove(rc.getLocation().directionTo(minableLocs.locs[i]))) {
+                if (moveLoc == null
+                        || (rc.getWeight() > 20 && miningHQLoc.distanceSquaredTo(moveLoc) > miningHQLoc.distanceSquaredTo(minableLocs.locs[i]))
+                        || (rc.getWeight() <= 20 && miningHQLoc.distanceSquaredTo(moveLoc) < miningHQLoc.distanceSquaredTo(minableLocs.locs[i]))) {
+                    moveLoc = minableLocs.locs[i];
                 }
             }
+        }
+        if (moveLoc != null && !moveLoc.equals(rc.getLocation())) {
+            rc.move(rc.getLocation().directionTo(moveLoc));
+        }
+    }
+
+    private static void handleMiningState() throws GameActionException {
+        if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
+            collect();
         } else { // moving toward mine
             // switch mine if original too congested
             if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= MapRecorder.getMinableSquares(miningWellLoc).size - 1) {
@@ -423,6 +423,9 @@ public class Carrier extends Unit {
             }
             moveToward(miningWellLoc);
             moveToward(miningWellLoc);
+            if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
+                collect();
+            }
             indicator += "2mine,";
         }
     }
@@ -445,7 +448,7 @@ public class Carrier extends Unit {
             if (rc.getWeight() == 0) {
                 congestedMines.clear();
                 if (tryFindMine()) {
-                    mine();
+                    handleMiningState();
                 }
             }
         }

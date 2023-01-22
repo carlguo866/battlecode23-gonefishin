@@ -1,6 +1,6 @@
-package bot1.util;
+package micro.submit11.util;
 
-import battlecode.common.*;
+import battlecode.common.MapLocation;
 
 public class FastIterableLocSet {
     public StringBuilder keys;
@@ -29,7 +29,6 @@ public class FastIterableLocSet {
             keys.append(key);
             size++;
         }
-
     }
 
     public void add(int x, int y) {

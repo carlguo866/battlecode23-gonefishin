@@ -1,7 +1,7 @@
-package bot1;
+package launcher;
 
 import battlecode.common.*;
-import bot1.util.FastIterableRobotInfoSet;
+import launcher.util.FastIterableRobotInfoSet;
 
 import java.util.AbstractMap;
 
@@ -27,7 +27,7 @@ public class Launcher extends Unit {
     // macro vars
     static RobotInfo masterLauncher = null;
     static int dis = 0;
-    //    static int friendlyLauncherCnt = 1;
+//    static int friendlyLauncherCnt = 1;
     static RobotInfo furthestFriendlyLauncher = null;
 
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
@@ -161,7 +161,7 @@ public class Launcher extends Unit {
         Direction result = null;
         for (Direction dir : dirs) {
             if (rc.canMove(dir) && (extraChecks<=1
-                    || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS)
+             || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS)
             )) {
                 if (result == null) result = dir;
                 if (rc.getLocation().add(result).distanceSquaredTo(loc) < rc.getLocation().add(dir).distanceSquaredTo(loc)) {

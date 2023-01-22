@@ -138,22 +138,27 @@ public class MapRecorder extends RobotPlayer {
             int y = hqY + HQ_SPAWNABLE_DELTA[i][1];
             if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x][y] & PASSIABLE_BIT) == 0)
                 continue;
-            if (x + 1 < mapWidth && (vals[x + 1][y] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (x + 1 < mapWidth && y - 1 >= 0 && (vals[x + 1][y - 1] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (x + 1 < mapWidth && y + 1 < mapHeight && (vals[x + 1][y + 1] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (x - 1 >= 0 && (vals[x - 1][y] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (x - 1 >= 0 && y - 1 >= 0 && (vals[x - 1][y - 1] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (x - 1 >= 0 && y + 1 < mapHeight && (vals[x - 1][y + 1] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (y - 1 >= 0 && (vals[x][y - 1] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
-            if (y + 1 < mapHeight && (vals[x][y + 1] & ACCESSIBLE_BIT) != 0)
-            {vals[x][y] |= ACCESSIBLE_BIT; Headquarter.spawnableSet.add(x, y); continue;}
+            do {
+                if (x + 1 < mapWidth && (vals[x + 1][y] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (x + 1 < mapWidth && y - 1 >= 0 && (vals[x + 1][y - 1] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (x + 1 < mapWidth && y + 1 < mapHeight && (vals[x + 1][y + 1] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (x - 1 >= 0 && (vals[x - 1][y] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (x - 1 >= 0 && y - 1 >= 0 && (vals[x - 1][y - 1] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (x - 1 >= 0 && y + 1 < mapHeight && (vals[x - 1][y + 1] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (y - 1 >= 0 && (vals[x][y - 1] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+                if (y + 1 < mapHeight && (vals[x][y + 1] & ACCESSIBLE_BIT) != 0)
+                {vals[x][y] |= ACCESSIBLE_BIT; break;}
+            } while (false);
+            if ((vals[x][y] & ACCESSIBLE_BIT) != 0 && (vals[x][y] & CURRENT_MASK) == 8) {
+                Headquarter.spawnableSet.add(x, y);
+            }
         }
         if (Headquarter.spawnableSet.size < 5) {
             System.out.println("HQ spawnable area too small, allow spawning on currents and unaccessible areas");

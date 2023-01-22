@@ -14,6 +14,7 @@ import java.awt.*;
  * 0-47: 4*2 6bits int specifying the coord of friendly HQs
  * 48-50: 3 bit whether symmetries of the map have been eliminated:
  * [ROTATIONAL, VERTIAL, HORIZONTAL]
+ * 51-54: 4 bits indicating whether the 4 HQs are congested
  *
  * well info 96-203 bits
  * wells info starting bit 96 of 3 types, each 36 bits total 108 bits
@@ -38,6 +39,7 @@ import java.awt.*;
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int SYM_BIT = 48;
+    private static final int CONGEST_BIT = 51;
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 487;
@@ -105,15 +107,16 @@ public class Comm extends RobotPlayer {
     // HQ locations starting at bit 0
 
     // this should be called by the setup of each HQ
-    public static void HQInit(MapLocation location, int HQID) {
+    public static int HQInit(MapLocation location, int HQID) {
         for (int i = 0; i < GameConstants.MAX_STARTING_HEADQUARTERS; i++) {
             if (friendlyHQLocations[i] == null) {
                 friendlyHQLocations[i] = location;
                 writeBits(i * 12, 12, loc2int(location));
-                return;
+                return i;
             }
         }
         assert false;
+        return -1;
     }
 
     private static void updateHQLocations() throws GameActionException {
@@ -146,6 +149,14 @@ public class Comm extends RobotPlayer {
                 }
             }
         }
+    }
+
+    public static void reportCongest(int hqid, boolean isCongested) {
+        writeBits(CONGEST_BIT + hqid, 1, isCongested? 1 : 0);
+    }
+
+    public static boolean isCongested() {
+        return readBits(CONGEST_BIT, 4) > 0;
     }
 
     // well infos starting

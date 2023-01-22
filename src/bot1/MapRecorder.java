@@ -13,6 +13,7 @@ public class MapRecorder extends RobotPlayer {
     public static final int ISLAND_BIT = 1 << 8;
     public static final int RECORDED_BIT = 1 << 10;
     public static final int CURRENT_MASK = 0xF;
+    public static final int SYM_MASK = 0xF0; // all bits used in symmetry checking except current
     // current use & 0xF for ordinal
 
     public static int[][] vals = new int[mapWidth][mapHeight];
@@ -62,7 +63,7 @@ public class MapRecorder extends RobotPlayer {
                         symCurrent = Unit.Dxy2dir(current.dx * -1, current.dy);
                         break;
                 }
-                isSym = (val & 0xFFF0) == (symVal & 0xFFF0) && (symCurrent.ordinal() == (symVal & 0xF));
+                isSym = (val & SYM_MASK) == (symVal & SYM_MASK) && (symCurrent.ordinal() == (symVal & CURRENT_MASK));
                 if (!isSym) {
                     Comm.eliminateSym(sym);
                     System.out.printf("sym %d elim at %s val %d symval %d\n", sym, info.getMapLocation(), val, symVal);

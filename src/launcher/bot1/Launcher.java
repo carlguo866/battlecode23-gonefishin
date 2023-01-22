@@ -1,33 +1,58 @@
-package micro.submit11;
+package launcher.bot1;
 
 import battlecode.common.*;
-import java.util.HashSet;
+import launcher.bot1.util.FastIterableRobotInfoSet;
+import launcher.bot1.util.FastLocIntMap;
+
+//import java.util.HashSet;
 
 public class Launcher extends Unit {
-    private static final int MAX_HEALTH = 20;
+    private static final int MAX_HEALTH = 200;
+    private static final int DAMAGE = 30;
     private static final int ATTACK_DIS = 16;
     private static final int VISION_DIS = 20;
+
+
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 
     static int clearedUntilRound = 0; // to mark if enemy has been cleared
 
     // micro vars
-    static RobotInfo attackTarget = null;
+    static MapLocation attackTarget = null;
     static RobotInfo closestEnemy = null;
     static int ourTeamStrength = 2;
     // macro vars
     static RobotInfo masterLauncher = null;
     static int dis = 0;
-    //    static int friendlyLauncherCnt = 1;
+    static int friendlyLauncherCnt = 1;
     static RobotInfo furthestFriendlyLauncher = null;
-    static Direction cachedDirection = null;
 
-    static HashSet<RobotInfo> friendlyLaunchers = null;
+    static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
+    static FastIterableRobotInfoSet enemies = new FastIterableRobotInfoSet();
 
-    static HashSet<RobotInfo> enemies = null;
+    static FastLocIntMap loc2info = new FastLocIntMap();
+    private static final int HEALTH_MASK = 0x000F;
+    private static final int TYPE_MASK = 0x00F0;
+    private static final int TYPE_SHIFT = 4;
+    private static final int IS_OUR_TEAM_BIT = 1 << 4;
+    // health is stored as the number of shots to kill
+    private void addInfo(RobotInfo robot) {
+        loc2info.remove(robot.location);
+        int val = robot.health / 30;
+        if (robot.team == myTeam)
+            val |= IS_OUR_TEAM_BIT;
+        val |= robot.type.ordinal() << TYPE_SHIFT;
+        loc2info.add(robot.location, val);
+    }
 
-
+    private void getInfo(MapLocation loc) {
+        // just copy this into your code and use it however you
+        int val = loc2info.getVal(loc);
+        boolean isOurTeam = (val & IS_OUR_TEAM_BIT) != 0;
+        int health = val & HEALTH_MASK; // this is the number of shots to kill
+        RobotType type = RobotType.values()[(val & TYPE_MASK) >> TYPE_SHIFT];
+    }
 
     static void sense() throws GameActionException {
         // micro vars
@@ -39,8 +64,10 @@ public class Launcher extends Unit {
         dis = 0;
 //        friendlyLauncherCnt = 1;
         furthestFriendlyLauncher = null;
-        friendlyLaunchers = new HashSet<>();
-        enemies = new HashSet<>();
+        friendlyLaunchers.clear();
+        enemies.clear();
+
+
         for (RobotInfo robot : rc.senseNearbyRobots()) {
             if (robot.team == myTeam) {
                 if (robot.type == RobotType.LAUNCHER) {
@@ -70,62 +97,41 @@ public class Launcher extends Unit {
 //                } else if (robot.type == RobotType.DESTABILIZER) {
 //                    ourTeamStrength -= 3;
 //                }
-
+//                attackTarget = targetPriority(attackTarget, robot);
                 if (closestEnemy == null || rc.getLocation().distanceSquaredTo(closestEnemy.location) >
                         rc.getLocation().distanceSquaredTo(robot.location)) {
                     closestEnemy = robot;
                 }
             }
         }
+        friendlyLaunchers.updateIterable();
+        enemies.updateIterable();
         attackTarget = targetPriority(friendlyLaunchers, enemies);
-//        indicator += String.format("target%s", attackTarget);
     }
 
     static void micro() throws GameActionException {
         if (attackTarget != null) {
-            int attackCooldown = rc.getActionCooldownTurns();
-//            indicator += String.format("attackcool%d", attackCooldown);
-            int moveCooldown = rc.getMovementCooldownTurns();
-//            indicator += String.format("movecool%d", moveCooldown);
-            if (attackTarget != null && rc.canAttack(attackTarget.location)) {
-                rc.attack(attackTarget.location);
+            if (attackTarget != null && rc.canAttack(attackTarget)) {
+                rc.attack(attackTarget);
             }
             if (rc.isMovementReady()) {
                 // move toward enemy if sensed an enemy outside attack range
                 if (rc.isActionReady()) {
-                    // this is never going to trigger?
-//                    indicator += String.format("seen but not attack");
-                    Direction forwardDir = rc.getLocation().directionTo(attackTarget.location);
+                    Direction forwardDir = rc.getLocation().directionTo(attackTarget);
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
                     for (Direction dir : dirs) {
-                        if (rc.getLocation().distanceSquaredTo(attackTarget.location) > ATTACK_DIS &&
-                                rc.getLocation().add(dir).distanceSquaredTo(attackTarget.location) <= ATTACK_DIS
+                        if (rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS
                                 && rc.canMove(dir)) {
                             rc.move(dir);
-                            if (rc.canAttack(attackTarget.location)) {
-                                rc.attack(attackTarget.location);
+                            if (rc.canAttack(attackTarget)) {
+                                rc.attack(attackTarget);
                             }
                         }
                     }
                 } else {
-                    // if at disadvantage or more healthy launcher in sight, pull back
-//                    if () {// ourTeamStrength < 0 ||
-//
-//                    } else {
-                    // if I can back off to a location that I can still attack from, kite back
-
-//                    cachedDirection =  rc.getLocation().directionTo(closestEnemy.location);
-//                    Direction backDir = cachedDirection.opposite();
-//                    Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
-//                            backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
-//                    for (Direction dir : dirs) {
-//                        if (rc.canMove(dir)) {
-//                            rc.move(dir);
-//                            break;
-//                        }
-//                    }
-                    if (rc.getHealth() <= 12) {
+                    // if at disadvantage pull back
+                    if (ourTeamStrength < 0 || rc.getHealth() <= 120) {
                         Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
                         Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
                                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
@@ -135,42 +141,22 @@ public class Launcher extends Unit {
                                 break;
                             }
                         }
-                    }
-
-                    if (attackTarget.type == RobotType.LAUNCHER) {
-                        kite(attackTarget);
-//                        Direction backDir = rc.getLocation().directionTo(attackTarget.location).opposite();
-//                        Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
-//                                backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
-//                        for (Direction dir : dirs) {
-//                            if (rc.canMove(dir)) {
-//                                //rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
-//                                //                                &&
-//                                cachedDirection = dir.opposite();
-//                                rc.move(dir);
-//                                indicator += String.format("Kiting%s", dir);
-//                                break;
-//                            }
-//                        }
-//
+                    } else {
+                        // if I can back off to a location that I can still attack from, kite back
+                        Direction backDir = rc.getLocation().directionTo(closestEnemy.location).opposite();
+                        Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
+                                backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
+                        for (Direction dir : dirs) {
+                            if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.LAUNCHER_ATTACK_DIS
+                                    && rc.canMove(dir)) {
+                                rc.move(dir);
+                                break;
+                            }
+                        }
                     }
                 }
             }
-            indicator += String.format("Micro strength %d", ourTeamStrength);
-        } else {
-//            if (rc.isMovementReady() && cachedDirection != null) {
-////                    Direction[] dirs = {cachedDirection, cachedDirection.rotateRight(), cachedDirection.rotateLeft(),
-////                            cachedDirection.rotateRight().rotateRight(), cachedDirection.rotateLeft().rotateLeft()};
-////                    for (Direction dir : dirs) {
-//                if ( rc.canMove(cachedDirection)) {
-//                    //rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= ATTACK_DIS
-//                    //                                &&
-//                    rc.move(cachedDirection);
-//                    indicator += String.format("Cached Direction2 %s", cachedDirection);
-//                }
-////                    }
-//                cachedDirection = null;
-//            }
+            indicator += String.format("Strength%d ", ourTeamStrength);
         }
     }
 
@@ -186,10 +172,9 @@ public class Launcher extends Unit {
             return;
         }
 
-
         sense();
         micro();
-        if (attackTarget == null) { // macro
+        if (rc.isMovementReady() && attackTarget == null) { // macro
             // the launcher with the smallest ID is the master, everyone follows him
             if (masterLauncher != null) {
                 indicator += String.format("Following master %d at %s", masterLauncher.getID(), masterLauncher.location);
@@ -209,7 +194,7 @@ public class Launcher extends Unit {
                         indicator += String.format("M2E@%s", enemyLocation);
                     }
                 } else
-                if (dis >= 9 && friendlyLaunchers.size() <= 3) {
+                if (dis >= 9 && friendlyLauncherCnt <= 3) {
                     // if there is a launcher going far away while there are few launchers,
                     // most likely it has seen something, follow him
                     indicator += String.format("Mfollow %s", furthestFriendlyLauncher.location);
@@ -236,63 +221,61 @@ public class Launcher extends Unit {
                 }
             }
         }
-        sense();
-        micro();
-    }
-    private static Direction kite(RobotInfo target) throws GameActionException {
-        Direction backDir = rc.getLocation().directionTo(target.location).opposite();
-        Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
-                backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
-        Direction result = null;
-        for (Direction dir : dirs) {
-            if (rc.canMove(dir)) {
-                if (result == null) result = dir;
-//                if (rc.getLocation().add(result).distanceSquaredTo(target.location) > ATTACK_DIS
-//                    && rc.getLocation().add(dir).distanceSquaredTo(target.location) <= ATTACK_DIS) {
-//                    result = dir;
-//                }
-                if (rc.getLocation().add(result).distanceSquaredTo(target.location) < rc.getLocation().add(dir).distanceSquaredTo(target.location)) {
-                    result = dir;
-                }
-                indicator += String.format("Kiting%s", dir);
-            }
+        if (rc.isActionReady()){
+            sense();
+            micro();
         }
-        rc.move(result);
-        cachedDirection = result.opposite();
-        return result;
     }
-    private static RobotInfo targetPriority(HashSet<RobotInfo> friendlyLaunchers, HashSet<RobotInfo> enemies) {
-//        if (!rc.canActLocation(r2.location))
-//            return r1; very questionable
-        RobotInfo target = null;
-        int maxCanAttackFriends = 0;
-        for (RobotInfo enemy: enemies){
+
+    private static MapLocation targetPriority(FastIterableRobotInfoSet friendlyLaunchers, FastIterableRobotInfoSet enemies) {
+        MapLocation target = null;
+//        if (enemies.size() == 0){
+//            return target;
+//        }
+        int minHitRatio = 10;
+        int maxCanAttackFriends = 1;
+        boolean yes = false;
+        for (MapLocation enemy: enemies.locs){
+            System.out.println("enemy.x"+ enemy.x);
             if (target == null) {
                 target = enemy;
-            }else if (target.type != RobotType.LAUNCHER && enemy.type == RobotType.LAUNCHER){
-                target = enemy;
             }
-
-            if (target.type == RobotType.LAUNCHER && enemy.type != RobotType.LAUNCHER){
-                continue;
-            }
-
-            int canAttackFriends = 0;
-            for (RobotInfo friend: friendlyLaunchers){
-                if (friend.location.distanceSquaredTo(target.location) <= ATTACK_DIS){
+//            else if (target.type != RobotType.LAUNCHER && enemy.type == RobotType.LAUNCHER){
+//                target = enemy;
+////                System.out.println("here change to launcher");
+//            }else if (target.type == RobotType.LAUNCHER && enemy.type != RobotType.LAUNCHER){
+//                continue;
+//            }
+            int canAttackFriends = 1;
+            for (MapLocation friend: enemies.locs){
+                if (friend.distanceSquaredTo(target) <= VISION_DIS){
                     canAttackFriends+=1;
                 }
             }
-            if (target == enemy) {
-                maxCanAttackFriends = canAttackFriends;
-            } else {
-                if (maxCanAttackFriends < canAttackFriends){
-                    target = enemy;
-                } else if (maxCanAttackFriends == canAttackFriends){
-                    target = target.health < enemy.health? target : enemy;
-                }
-            }
+//            System.out.println(String.format("loc%s", enemy));
+//            int hitRatio = (int) Math.ceil((double) enemy.health / (canAttackFriends * DAMAGE) );
+//            if (target == enemy) {
+//                minHitRatio = hitRatio;
+//            } else {
+//                if (minHitRatio > (int) hitRatio){
+//                    target = enemy;
+//                    maxCanAttackFriends = canAttackFriends;
+//                } else if (minHitRatio == canAttackFriends){
+//                    target = rc.getLocation().distanceSquaredTo(target) <
+//                            rc.getLocation().distanceSquaredTo(enemy)? target : enemy;
+//                    maxCanAttackFriends = canAttackFriends;
+//                }
+//            }
         }
+//        indicator += String.format("pos%s", rc.getLocation());
+        indicator += String.format("tgt%s", target);
+//        indicator += String.format("health%s ", target.health);
+//        indicator += String.format("friends%s ", maxCanAttackFriends);
+//        indicator += String.format("ratio%s ", minHitRatio);
+//        indicator += String.format("target%s ", target.getID());
+//        rc.setIndicatorLine(rc.getLocation(), target.location, 0, 0 , 0);
+
+//        assert (!yes || (yes && target.type == RobotType.LAUNCHER)): String.format("targettype%s", target.type);
         return target;
     }
 
@@ -307,3 +290,4 @@ public class Launcher extends Unit {
         return r1.getID() < r2.getID()? r1 : r2;
     }
 }
+

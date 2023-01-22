@@ -1,10 +1,10 @@
-package bot1;
+package launcher.bot1;
 
 import battlecode.common.*;
+import launcher.bot1.util.FastIterableLocSet;
+import launcher.bot1.util.FastLocIntMap;
 
 import java.util.Random;
-import bot1.util.FastIterableLocSet;
-import bot1.util.FastLocIntMap;
 
 public class Carrier extends Unit {
     // purposes

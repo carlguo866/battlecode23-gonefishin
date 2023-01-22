@@ -1,6 +1,6 @@
-package bot1.util;
+package launcher.bot1.util;
 
-import battlecode.common.*;
+import battlecode.common.MapLocation;
 
 public class FastIterableLocSet {
     public StringBuilder keys;
@@ -8,6 +8,8 @@ public class FastIterableLocSet {
     public MapLocation[] locs;
     public int size;
     private int earliestRemoved;
+
+
 
     public FastIterableLocSet() {
         this(100);
@@ -29,7 +31,6 @@ public class FastIterableLocSet {
             keys.append(key);
             size++;
         }
-
     }
 
     public void add(int x, int y) {

@@ -1,4 +1,4 @@
-package bot1;
+package launcher.bot1;
 
 import battlecode.common.*;
 

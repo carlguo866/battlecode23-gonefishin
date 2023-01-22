@@ -1,9 +1,6 @@
-package bot1;
+package submit13;
 
 import battlecode.common.*;
-import scala.collection.mutable.LinkedEntry;
-
-import java.awt.*;
 
 /***
  *
@@ -156,13 +153,12 @@ public class Comm extends RobotPlayer {
                 closestWells[resourceID][i] = int2loc(readBits(startingBit, 12));
             }
         }
-        if (rc.getType() == RobotType.CARRIER && turnCount != 0) {
-            Carrier.updateWells();
-        }
         needWellsUpdate = false;
     }
 
-    public static void reportWells(int resourceID, MapLocation wellLocation) {
+    public static void reportWells(WellInfo well) {
+        MapLocation wellLocation = well.getMapLocation();
+        int resourceID = well.getResourceType().resourceID;
         int closestHQID = Unit.getClosestID(wellLocation, friendlyHQLocations);
         int maxDis = friendlyHQLocations[closestHQID].distanceSquaredTo(wellLocation);
 
@@ -172,7 +168,7 @@ public class Comm extends RobotPlayer {
                 updateIndex = i;
                 break;
             }
-            if (closestWells[resourceID][i].equals(wellLocation)){
+            if (closestWells[resourceID][i].equals(well.getMapLocation())){
                 return;
             }
             int original_dis = Unit.getClosestDis(closestWells[resourceID][i], friendlyHQLocations);

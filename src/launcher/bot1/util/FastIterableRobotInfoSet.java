@@ -1,19 +1,19 @@
-package bot1.util;
+package launcher.bot1.util;
 
 import battlecode.common.*;
 
-public class FastIterableLocSet {
+public class FastIterableRobotInfoSet {
     public StringBuilder keys;
     public int maxlen;
     public MapLocation[] locs;
     public int size;
     private int earliestRemoved;
 
-    public FastIterableLocSet() {
+    public FastIterableRobotInfoSet() {
         this(100);
     }
 
-    public FastIterableLocSet(int len) {
+    public FastIterableRobotInfoSet(int len) {
         keys = new StringBuilder();
         maxlen = len;
         locs = new MapLocation[maxlen];

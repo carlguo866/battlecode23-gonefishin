@@ -1,4 +1,4 @@
-package launcher.bot1.util;
+package launcher.util;
 
 import battlecode.common.MapLocation;
 

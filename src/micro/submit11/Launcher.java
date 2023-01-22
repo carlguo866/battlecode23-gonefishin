@@ -30,6 +30,7 @@ public class Launcher extends Unit {
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
     static FastIterableRobotInfoSet enemies = new FastIterableRobotInfoSet();
 
+    static Direction cachedDirection = null;
     // health is stored as the number of shots to kill
 
     static void sense() throws GameActionException {

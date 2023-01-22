@@ -1,7 +1,7 @@
 package bot1.util;
 
 import battlecode.common.*;
-import launcher.bot1.util.FastLocIntMap;
+import launcher.util.FastLocIntMap;
 
 public class FastIterableRobotInfoSet {
     public StringBuilder keys;
@@ -10,7 +10,7 @@ public class FastIterableRobotInfoSet {
     public int size;
     private int earliestRemoved;
 
-    static launcher.bot1.util.FastLocIntMap loc2info;
+    static FastLocIntMap loc2info;
 
     private static final int HEALTH_MASK = 0x000F;
     private static final int TYPE_MASK = 0x00F0;
@@ -20,7 +20,7 @@ public class FastIterableRobotInfoSet {
 
     public FastIterableRobotInfoSet() {
         this(100);
-        loc2info = new launcher.bot1.util.FastLocIntMap();
+        loc2info = new FastLocIntMap();
     }
 
     public FastIterableRobotInfoSet(int len) {
@@ -67,6 +67,7 @@ public class FastIterableRobotInfoSet {
         size = 0;
         keys = new StringBuilder();
         earliestRemoved = 0;
+        locs = new MapLocation[maxlen];
         loc2info.clear();
     }
 

@@ -1,5 +1,5 @@
 // https://github.com/BSreenivas0713/Battlecode2022/blob/main/src/MPBasic/fast/FastLocIntMap.java
-package launcher.bot1.util;
+package launcher.util;
 
 import battlecode.common.MapLocation;
 

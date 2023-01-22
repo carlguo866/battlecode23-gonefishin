@@ -1,7 +1,7 @@
-package launcher.bot1;
+package launcher;
 
 import battlecode.common.*;
-import launcher.bot1.util.FastIterableLocSet;
+import launcher.util.FastIterableLocSet;
 
 public class MapRecorder extends RobotPlayer {
     // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting

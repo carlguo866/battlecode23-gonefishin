@@ -1,4 +1,4 @@
-package launcher.bot1;
+package launcher;
 
 import battlecode.common.Direction;
 

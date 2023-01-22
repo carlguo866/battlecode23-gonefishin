@@ -48,7 +48,7 @@ public class Headquarter extends Unit {
             indicator += "anchoring";
         } else {
             int maxLauncherSpawn = Math.max(5, rc.getResourceAmount(ResourceType.MANA) / Constants.LAUNCHER_COST_MN);
-            if (maxLauncherSpawn > enemyCount) {
+            if (turnCount != 0 && maxLauncherSpawn > enemyCount) {
                 // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
                 for (int i = 5; --i >= 0
                         && rc.isActionReady()

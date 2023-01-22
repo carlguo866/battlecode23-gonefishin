@@ -29,11 +29,11 @@ public class Unit extends RobotPlayer {
 
     static void tryMoveDir(Direction dir) throws GameActionException {
         if (rc.isMovementReady()) {
-            if (rc.canMove(dir)) {
+            if (rc.canMove(dir) && canPass(dir)) {
                 rc.move(dir);
-            } else if (rc.canMove(dir.rotateRight())) {
+            } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight())) {
                 rc.move(dir.rotateRight());
-            } else if (rc.canMove(dir.rotateLeft())) {
+            } else if (rc.canMove(dir.rotateLeft()) && canPass(dir.rotateLeft())) {
                 rc.move(dir.rotateLeft());
             } else if (rc.canMove(dir.rotateRight().rotateRight())) {
                 rc.move(dir.rotateRight().rotateRight());
@@ -101,7 +101,7 @@ public class Unit extends RobotPlayer {
                 stuckCnt = 0;
             }
             lastLocation = rc.getLocation();
-            if (stuckCnt > 5) {
+            if (stuckCnt >= 3) {
                 indicator += "stuck reset";
                 randomMove();
                 pathingCnt = 0;
@@ -109,26 +109,20 @@ public class Unit extends RobotPlayer {
 
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
-                while ((!rc.canMove(dir) || !canPass(dir)) && pathingCnt != 8) {
-                    MapLocation loc = rc.getLocation().add(dir);
-                    if (rc.onTheMap(loc) && rc.senseRobotAtLocation(loc) != null && rc.senseRobotAtLocation(loc).type != RobotType.HEADQUARTERS) {
-                        // a robot is blocking our way, reset and use follow instead
-                        pathingCnt = 0;
-                        indicator += "use follow,";
-                        follow(location);
-                        return;
-                    }
-                    prv[pathingCnt] = dir;
-                    pathingCnt++;
-                    dir = dir.rotateLeft();
-                }
-                if (pathingCnt != 8) {
-                    rc.move(dir);
+                if (canPass(dir) || canPass(dir.rotateRight()) || canPass(dir.rotateLeft())) {
+                    tryMoveDir(dir);
                 } else {
-                    // we are blocked in all directions, nothing to do
-                    indicator += "perma blocked,";
-                    pathingCnt = 0;
-                    return;
+                    while (!canPass(dir) && pathingCnt != 8) {
+                        prv[pathingCnt] = dir;
+                        pathingCnt++;
+                        dir = dir.rotateLeft();
+                    }
+                    if (pathingCnt == 8) {
+                        indicator += "permblocked";
+                        randomMove();
+                    } else if (rc.canMove(dir)) {
+                        rc.move(dir);
+                    }
                 }
             } else {
                 while (pathingCnt > 0 && canPass(prv[pathingCnt - 1])) {
@@ -148,26 +142,26 @@ public class Unit extends RobotPlayer {
                 } else {
                     // a robot blocking us while we are following wall, wait
                     indicator += "blocked";
-                    return;
                 }
             }
         }
     }
 
-    static boolean canPass(MapLocation loc) throws GameActionException {
-        if (!rc.onTheMap(loc) || !rc.senseMapInfo(loc).isPassable())
+    static boolean canPass(Direction dir) throws GameActionException {
+        MapLocation loc = rc.getLocation().add(dir);
+        if (!rc.onTheMap(loc))
+            return false;
+        MapInfo info = rc.senseMapInfo(loc);
+        if (!info.isPassable())
             return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null && robot.type == RobotType.HEADQUARTERS)
             return false;
         // only allow empty carrier to go onto current for now
-        if (rc.senseMapInfo(loc).getCurrentDirection() != Direction.CENTER)
-            return rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12;
-        return true;
-    }
-
-    static boolean canPass(Direction dir) throws GameActionException {
-        return canPass(rc.getLocation().add(dir));
+        Direction current = info.getCurrentDirection();
+        if (current == Direction.CENTER || current == dir || current == dir.rotateLeft() || current == dir.rotateRight())
+            return true;
+        return rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12;
     }
 
     static Direction Dxy2dir(int dx, int dy) {

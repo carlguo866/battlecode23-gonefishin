@@ -1,8 +1,7 @@
-package launcher.bot1.util;
+package bot1.util;
 
-import battlecode.common.MapLocation;
-import battlecode.common.RobotInfo;
-import battlecode.common.RobotType;
+import battlecode.common.*;
+import launcher.bot1.util.FastLocIntMap;
 
 public class FastIterableRobotInfoSet {
     public StringBuilder keys;
@@ -11,7 +10,7 @@ public class FastIterableRobotInfoSet {
     public int size;
     private int earliestRemoved;
 
-    static FastLocIntMap loc2info;
+    static launcher.bot1.util.FastLocIntMap loc2info;
 
     private static final int HEALTH_MASK = 0x000F;
     private static final int TYPE_MASK = 0x00F0;
@@ -20,8 +19,8 @@ public class FastIterableRobotInfoSet {
     // health is stored as the number of shots to kill
 
     public FastIterableRobotInfoSet() {
-        this(70);
-        loc2info = new FastLocIntMap();
+        this(100);
+        loc2info = new launcher.bot1.util.FastLocIntMap();
     }
 
     public FastIterableRobotInfoSet(int len) {
@@ -93,10 +92,7 @@ public class FastIterableRobotInfoSet {
         return val & HEALTH_MASK; // this is the number of shots to kill
     }
     public RobotType getRobotType(MapLocation loc){
-        System.out.println(String.format("loc%s", loc));
         int val = loc2info.getVal(loc);
-        System.out.println(String.format("aldfnakd%d",(val & TYPE_MASK) >> TYPE_SHIFT));
-        System.out.println(String.format("RobotType%s",RobotType.values()[(val & TYPE_MASK) >> TYPE_SHIFT]));
         return RobotType.values()[(val & TYPE_MASK) >> TYPE_SHIFT];
     }
 

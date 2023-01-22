@@ -149,7 +149,7 @@ public class Comm extends RobotPlayer {
     public static void updateWells() {
         for (int resourceID = 1; resourceID <= 2; resourceID++) {
             for (int i = 0; i < NUM_WELLS; i++) {
-                int startingBit = WELL_INFO_BIT + ((resourceID - 1) * 3 + i) * 12;
+                int startingBit = WELL_INFO_BIT + ((resourceID - 1) * NUM_WELLS + i) * 12;
                 closestWells[resourceID][i] = int2loc(readBits(startingBit, 12));
             }
         }
@@ -181,7 +181,7 @@ public class Comm extends RobotPlayer {
 
         if (updateIndex != -1) {
             // update shared array
-            int startingBit = WELL_INFO_BIT + ((resourceID - 1) * 3 + updateIndex) * 12;
+            int startingBit = WELL_INFO_BIT + ((resourceID - 1) * NUM_WELLS + updateIndex) * 12;
             writeBits(startingBit, 12, loc2int(wellLocation));
             needWellsUpdate = true;
         }

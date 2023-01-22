@@ -38,7 +38,6 @@ public class FastLocIntMap {
         if ((index = keys.indexOf(key)) >= 0) {
             keys.delete(index, index + 4);
             size--;
-
             if(earliestRemoved > index)
                 earliestRemoved = index;
         }
@@ -76,7 +75,6 @@ public class FastLocIntMap {
         if (idx != -1) {
             return (int)keys.charAt(idx + 3) - 0x100;
         }
-
         return -1;
     }
 

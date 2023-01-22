@@ -9,8 +9,6 @@ public class FastIterableLocSet {
     public int size;
     private int earliestRemoved;
 
-
-
     public FastIterableLocSet() {
         this(100);
     }
@@ -31,6 +29,7 @@ public class FastIterableLocSet {
             keys.append(key);
             size++;
         }
+
     }
 
     public void add(int x, int y) {

@@ -11,12 +11,17 @@ public class MapRecorder extends RobotPlayer {
     public static final int WELL_BIT = 1 << 6;
     public static final int PASSIABLE_BIT = 1 << 7;
     public static final int ISLAND_BIT = 1 << 8;
+    public static final int RECORDED_BIT = 1 << 10;
     public static final int CURRENT_MASK = 0xF;
+    public static final int SYM_MASK = 0xF0; // all bits used in symmetry checking except current
     // current use & 0xF for ordinal
 
     public static int[][] vals = new int[mapWidth][mapHeight];
 
     public static void recordSym(int leaveBytecodeCnt) throws GameActionException {
+        if ((vals[rc.getLocation().x][rc.getLocation().y] & RECORDED_BIT) != 0) {
+            return;
+        }
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
@@ -58,23 +63,22 @@ public class MapRecorder extends RobotPlayer {
                         symCurrent = Unit.Dxy2dir(current.dx * -1, current.dy);
                         break;
                 }
-                isSym = (val & 0xFFF0) == (symVal & 0xFFF0) && (symCurrent.ordinal() == (symVal & 0xF));
+                isSym = (val & SYM_MASK) == (symVal & SYM_MASK) && (symCurrent.ordinal() == (symVal & CURRENT_MASK));
                 if (!isSym) {
                     Comm.eliminateSym(sym);
                     System.out.printf("sym %d elim at %s val %d symval %d\n", sym, info.getMapLocation(), val, symVal);
                 }
             }
-
             vals[x][y] = val;
         }
+        vals[rc.getLocation().x][rc.getLocation().y] |= RECORDED_BIT;
     }
 
-    private static MapLocation lastRecordLocation = new MapLocation(-1, -1);
     // currently used to record whether areas have been scouted
     public static void recordFast(int leaveBytecodeCnt) throws GameActionException {
-        if (rc.getLocation().equals(lastRecordLocation))
+        if ((vals[rc.getLocation().x][rc.getLocation().y] & RECORDED_BIT) != 0) {
             return;
-        lastRecordLocation = rc.getLocation();
+        }
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
@@ -82,6 +86,7 @@ public class MapRecorder extends RobotPlayer {
             }
             vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = (infos[i].isPassable()? (SEEN_BIT | PASSIABLE_BIT) : SEEN_BIT) | infos[i].getCurrentDirection().ordinal();
         }
+        vals[rc.getLocation().x][rc.getLocation().y] |= RECORDED_BIT;
     }
 
     public static FastIterableLocSet getMinableSquares(MapLocation mineLoc) {

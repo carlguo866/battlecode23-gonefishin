@@ -1,9 +1,6 @@
-package bot1;
+package submit15v3;
 
 import battlecode.common.*;
-import scala.collection.mutable.LinkedEntry;
-
-import java.awt.*;
 
 /***
  *

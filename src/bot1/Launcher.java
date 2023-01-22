@@ -120,11 +120,6 @@ public class Launcher extends Unit {
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
-        if (rc.getRoundNum() <= 6) {
-            // first two rounds just wait for the other two to join and move together
-            return;
-        }
-
         sense();
         micro();
         if (closestEnemy == null) { // macro

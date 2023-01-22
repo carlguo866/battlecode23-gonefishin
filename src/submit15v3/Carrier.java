@@ -1,8 +1,8 @@
-package submit15v2;
+package submit15v3;
 
 import battlecode.common.*;
-import submit15v2.util.FastIterableLocSet;
-import submit15v2.util.FastLocIntMap;
+import submit15v3.util.FastIterableLocSet;
+import submit15v3.util.FastLocIntMap;
 
 import java.util.Random;
 

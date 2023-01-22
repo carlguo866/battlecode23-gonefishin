@@ -1,4 +1,4 @@
-package submit15v2;
+package submit15v3;
 
 import battlecode.common.Direction;
 

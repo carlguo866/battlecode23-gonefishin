@@ -11,7 +11,6 @@ public class Carrier extends Unit {
     public static final int MINE_MN = 1; // mining is default
     public static final int MINE_AD = 2;
     public static final int SCOUT_SYMMETRY = 3;
-w
     public static final int MINING = 10;
     public static final int DROPPING_RESOURCE = 11;
 

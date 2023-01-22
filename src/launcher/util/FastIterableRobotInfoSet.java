@@ -68,6 +68,7 @@ public class FastIterableRobotInfoSet {
         size = 0;
         keys = new StringBuilder();
         earliestRemoved = 0;
+        locs = new MapLocation[maxlen];
         loc2info.clear();
     }
 

@@ -1,7 +1,8 @@
 package bot1.util;
 
-import battlecode.common.*;
-import launcher.util.FastLocIntMap;
+import battlecode.common.MapLocation;
+import battlecode.common.RobotInfo;
+import battlecode.common.RobotType;
 
 public class FastIterableRobotInfoSet {
     public StringBuilder keys;
@@ -19,7 +20,7 @@ public class FastIterableRobotInfoSet {
     // health is stored as the number of shots to kill
 
     public FastIterableRobotInfoSet() {
-        this(100);
+        this(70);
         loc2info = new FastLocIntMap();
     }
 
@@ -93,7 +94,10 @@ public class FastIterableRobotInfoSet {
         return val & HEALTH_MASK; // this is the number of shots to kill
     }
     public RobotType getRobotType(MapLocation loc){
+        System.out.println(String.format("loc%s", loc));
         int val = loc2info.getVal(loc);
+        System.out.println(String.format("aldfnakd%d",(val & TYPE_MASK) >> TYPE_SHIFT));
+        System.out.println(String.format("RobotType%s",RobotType.values()[(val & TYPE_MASK) >> TYPE_SHIFT]));
         return RobotType.values()[(val & TYPE_MASK) >> TYPE_SHIFT];
     }
 

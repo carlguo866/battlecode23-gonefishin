@@ -1,7 +1,7 @@
 package launcher;
 
 import battlecode.common.*;
-import bot1.util.FastIterableRobotInfoSet;
+import launcher.util.FastIterableRobotInfoSet;
 
 import java.util.AbstractMap;
 
@@ -12,7 +12,7 @@ public class Launcher extends Unit {
     private static final int ATTACK_DIS = 16;
 
     private static final int VISION_DIS = 20;
-    
+
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 

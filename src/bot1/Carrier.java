@@ -426,7 +426,7 @@ public class Carrier extends Unit {
             if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
                 collect();
             }
-            indicator += "2mine,";
+            indicator += String.format("2%s", miningWellLoc);
         }
     }
 
@@ -435,15 +435,13 @@ public class Carrier extends Unit {
         int mn = rc.getResourceAmount(ResourceType.MANA);
         if (!rc.getLocation().isAdjacentTo(miningHQLoc)) {
             moveToward(miningHQLoc);
-            indicator += "2drop";
+            indicator += String.format("2%s", miningHQLoc);
         }
         if (rc.getLocation().isAdjacentTo(miningHQLoc)) {
             if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
                 rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
-                indicator += "drop";
             } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
                 rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
-                indicator += "drop";
             }
             if (rc.getWeight() == 0) {
                 congestedMines.clear();

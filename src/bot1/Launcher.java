@@ -147,7 +147,6 @@ public class Launcher extends Unit {
                     for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
                         if (Comm.enemyHQLocations[i % 4] != null) {
                             enemyHQID = i % 4;
-                            enemyHQLoc = Comm.enemyHQLocations[i % 4];
                             break;
                         }
                     }

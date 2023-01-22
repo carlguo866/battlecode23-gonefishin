@@ -1,5 +1,5 @@
 // https://raw.githubusercontent.com/BSreenivas0713/Battlecode2022/main/src/MPBasic/fast/FastIterableIntSet.java
-package submit15_pathing.util;
+package submit15v2.util;
 
 /**
  * Interface to represent ints up to 65535 (2^16-1)

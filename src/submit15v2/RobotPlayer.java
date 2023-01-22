@@ -1,4 +1,4 @@
-package submit15_pathing;
+package submit15v2;
 
 import battlecode.common.Clock;
 import battlecode.common.GameActionException;

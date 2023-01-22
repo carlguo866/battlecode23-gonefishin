@@ -1,4 +1,4 @@
-package submit15_pathing;
+package submit15v2;
 
 import battlecode.common.*;
 
@@ -29,11 +29,11 @@ public class Unit extends RobotPlayer {
 
     static void tryMoveDir(Direction dir) throws GameActionException {
         if (rc.isMovementReady()) {
-            if (rc.canMove(dir)) {
+            if (rc.canMove(dir) && canPass(dir)) {
                 rc.move(dir);
-            } else if (rc.canMove(dir.rotateRight())) {
+            } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight())) {
                 rc.move(dir.rotateRight());
-            } else if (rc.canMove(dir.rotateLeft())) {
+            } else if (rc.canMove(dir.rotateLeft()) && canPass(dir.rotateLeft())) {
                 rc.move(dir.rotateLeft());
             } else if (rc.canMove(dir.rotateRight().rotateRight())) {
                 rc.move(dir.rotateRight().rotateRight());

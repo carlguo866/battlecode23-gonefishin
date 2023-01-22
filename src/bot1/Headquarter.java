@@ -3,6 +3,8 @@ package bot1;
 import battlecode.common.*;
 import bot1.util.FastIterableLocSet;
 
+import java.util.Map;
+
 public class Headquarter extends Unit {
     private static int carrierCnt = 0;
     public static FastIterableLocSet spawnableSet = null; // set by MapRecorder.hqInit()
@@ -18,13 +20,13 @@ public class Headquarter extends Unit {
             Comm.commit_write();
             MapRecorder.hqInit();
             if (Comm.friendlyHQLocations[0].equals(rc.getLocation())) {
-                trySpawn(RobotType.CARRIER, Carrier.SCOUT_SYMMETRY);
+                trySpawn(RobotType.CARRIER, new MapLocation(mapWidth / 2, mapHeight / 2), Carrier.SCOUT_SYMMETRY);
             }
         }
 
         if (!Comm.isSymmetryConfirmed && turnCount > 0 && turnCount % 150 == 0) {
             System.out.println("too long no sym, send another sym scout");
-            trySpawn(RobotType.CARRIER, Carrier.SCOUT_SYMMETRY);
+            trySpawn(RobotType.CARRIER, new MapLocation(mapWidth / 2, mapHeight / 2), Carrier.SCOUT_SYMMETRY);
         }
 
         RobotInfo closestEnemy = null;
@@ -58,7 +60,9 @@ public class Headquarter extends Unit {
                 for (int i = 5; --i >= 0
                         && rc.isActionReady()
                         && rc.getResourceAmount(ResourceType.MANA) >= Constants.LAUNCHER_COST_MN;) {
-                    trySpawn(RobotType.LAUNCHER, -1);
+                    if (!trySpawn(RobotType.LAUNCHER, new MapLocation(mapWidth / 2, mapHeight / 2), -1)) {
+                        break;
+                    }
                 }
             }
             if (closestEnemy == null) {
@@ -66,7 +70,9 @@ public class Headquarter extends Unit {
                 for (int i = 5; --i >= 0
                         && rc.isActionReady()
                         && rc.getResourceAmount(ResourceType.ADAMANTIUM) >= Constants.CARRIER_COST_AD;) {
-                    trySpawn(RobotType.CARRIER, ++carrierCnt % 3 == 0? Carrier.MINE_AD : Carrier.MINE_MN);
+                    if (!trySpawn(RobotType.CARRIER, rc.getLocation(), ++carrierCnt % 3 == 0? Carrier.MINE_AD : Carrier.MINE_MN)) {
+                        break;
+                    }
                 }
             }
         }
@@ -78,17 +84,23 @@ public class Headquarter extends Unit {
     }
 
     // if no need to set spawn flag pass -1
-    private static boolean trySpawn(RobotType robotType, int spawnFlag) throws GameActionException {
-        for (int i = 0; i < spawnableSet.size; i++) {
-            if(rc.canBuildRobot(robotType, spawnableSet.locs[i])) {
-                if (spawnFlag > 0 && !Comm.trySetSpawnFlag(spawnableSet.locs[i], spawnFlag)) {
-                    System.out.println("try spawn failed Q full");
-                    return false;
-                }
-                rc.buildRobot(robotType, spawnableSet.locs[i]);
-                return true;
+    private static boolean trySpawn(RobotType robotType, MapLocation center, int spawnFlag) throws GameActionException {
+        MapLocation bestSpawn = null;
+        for (int i = spawnableSet.size; --i >= 0;) {
+            if ((bestSpawn == null || spawnableSet.locs[i].distanceSquaredTo(center) < bestSpawn.distanceSquaredTo(center))
+                    && rc.canBuildRobot(robotType, spawnableSet.locs[i])) {
+                bestSpawn = spawnableSet.locs[i];
             }
         }
-        return false;
+        if (bestSpawn == null) {
+            System.out.println("out of loc to build");
+            return false;
+        }
+        if (spawnFlag > 0 && !Comm.trySetSpawnFlag(bestSpawn, spawnFlag)) {
+            System.out.println("try spawn failed Q full");
+            return false;
+        }
+        rc.buildRobot(robotType, bestSpawn);
+        return true;
     }
 }

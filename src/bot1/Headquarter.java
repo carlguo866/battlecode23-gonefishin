@@ -144,11 +144,11 @@ public class Headquarter extends Unit {
             System.out.println("out of loc to build");
             return false;
         }
+        rc.buildRobot(robotType, bestSpawn);
         if (spawnFlag > 0 && !Comm.trySetSpawnFlag(bestSpawn, spawnFlag)) {
             System.out.println("try spawn failed Q full");
             return false;
         }
-        rc.buildRobot(robotType, bestSpawn);
         return true;
     }
 }

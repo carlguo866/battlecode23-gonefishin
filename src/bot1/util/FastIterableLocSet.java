@@ -26,6 +26,8 @@ public class FastIterableLocSet {
     public void add(MapLocation loc) {
         String key = locToStr(loc);
         if (keys.indexOf(key) == -1) {
+            if (size == maxlen)
+                return;
             keys.append(key);
             size++;
         }

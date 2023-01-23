@@ -18,6 +18,10 @@ public class Launcher extends Unit {
         }
     }
 
+    static int betterDistance(MapLocation start, MapLocation end){
+        return (int) Math.max(Math.pow(Math.abs(start.x-end.x), 2), Math.pow(Math.abs(start.y-end.y), 2));
+    }
+
     private static final int MAX_HEALTH = 200;
     private static final int DAMAGE = 30;
     private static final int ATTACK_DIS = 16;
@@ -33,14 +37,18 @@ public class Launcher extends Unit {
     static MapLocation attackTarget = null;
 
     static SimpleLauncherInfo cachedAttackTarget = null;
+    static RobotInfo cachedFriendlyLauncher = null;
+    static int lastFriendSensedRound = -100;
     static int cachedTurn = 0;
     static int attackTargetHealth;
     static RobotType attackTargetType;
     static RobotInfo closestEnemy = null;
     static int ourTeamStrength = 1;
+    static int closeFriendsSize = 0; 
+
     // macro vars
-    static RobotInfo furthestFriendlyLauncher = null;
-    static int lastEnemeySensedRound = -100;
+    static RobotInfo closestFriendlyLauncher = null;
+    static int lastEnemySensedRound = -100;
 
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
     static FastIterableRobotInfoSet enemyLaunchers = new FastIterableRobotInfoSet();
@@ -54,45 +62,49 @@ public class Launcher extends Unit {
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
-        sense();
+        sense(false);
         micro(false);
-        indicator += String.format("actCool%d", rc.getActionCooldownTurns());
-        indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
+//        indicator += String.format("actCool%d", rc.getActionCooldownTurns());
+//        indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
         macro();
         if (rc.isActionReady()){
-            sense();
+            sense(false);
             micro(true);
         }
     }
 
-    static void sense() throws GameActionException {
+    static void sense(boolean isSecondTime) throws GameActionException {
         attackTarget = null;
         closestEnemy = null;
         ourTeamStrength = 1;
+        closeFriendsSize = 0;
         // macro vars
         int dis = 0;
-//        friendlyLauncherCnt = 1;
-        furthestFriendlyLauncher = null;
+        closestFriendlyLauncher = null;
         friendlyLaunchers.clear();
         enemyLaunchers.clear();
-        attackTargetHealth = (int) Math.ceil((double) 250 / 30);
+        attackTargetHealth = (int) Math.ceil((double) 250 / DAMAGE);
         for (RobotInfo robot : rc.senseNearbyRobots()) {
             if (robot.team == myTeam) {
                 if (robot.type == RobotType.LAUNCHER) {
-//                    ourTeamStrength += 2;
-//                    friendlyLauncherCnt += 1;
                     if (friendlyLaunchers.size < 6)
                         friendlyLaunchers.add(robot);
-//                    if (robot.location.distanceSquaredTo(rc.getLocation()) <= 10){
                     ourTeamStrength += 1;
-//                    }
-                    if (furthestFriendlyLauncher == null) {
-                        int newDis = robot.getLocation().distanceSquaredTo(rc.getLocation());
-                        if (newDis > dis) {
-                            dis = newDis;
-                            furthestFriendlyLauncher = robot;
-                        }
+                    if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4){
+//                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
+//                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
+                        closeFriendsSize+=1;
                     }
+                    if (closestFriendlyLauncher == null) {
+                        closestFriendlyLauncher = robot;
+                        dis = betterDistance(rc.getLocation(), robot.getLocation());
+                    }
+                    int newDis = betterDistance(rc.getLocation(), robot.getLocation());
+                    if (newDis < dis) {
+                        dis = newDis;
+                        closestFriendlyLauncher = robot;
+                    }
+                    lastFriendSensedRound = rc.getRoundNum();
                 }
             } else {
                 if (robot.type == RobotType.HEADQUARTERS) {
@@ -101,7 +113,7 @@ public class Launcher extends Unit {
                 } else if (robot.type == RobotType.LAUNCHER) {
                     enemyLaunchers.add(robot);
                     ourTeamStrength -= 1;
-                    lastEnemeySensedRound = rc.getRoundNum();
+                    lastEnemySensedRound = rc.getRoundNum();
                 } else {
                     int health = (int) Math.ceil((double) robot.health / DAMAGE);
                     if (attackTargetHealth > health) {
@@ -145,6 +157,9 @@ public class Launcher extends Unit {
                     ourTeamStrength -=1;
             }
         }
+        if (friendlyLaunchers.size != 0) {
+            cachedFriendlyLauncher = closestFriendlyLauncher;
+        }
         indicator += String.format("Strength%d", ourTeamStrength);
     }
 
@@ -152,8 +167,18 @@ public class Launcher extends Unit {
         if (!rc.isMovementReady()) {
             return;
         }
-        if ((rc.getRoundNum() - lastEnemeySensedRound < 20 && friendlyLaunchers.size < 5) || friendlyLaunchers.size == 0) {
-            return;
+        indicator += String.format("size%d", closeFriendsSize);
+//        if (closestFriendlyLauncher != null) {
+//            rc.setIndicatorLine(rc.getLocation(), closestFriendlyLauncher.getLocation(), 0 ,0,0);
+//        }
+        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 5) && closeFriendsSize < 2 ) {
+            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
+                moveToward(closestFriendlyLauncher.location);
+                return;
+            } else if (cachedFriendlyLauncher != null) {
+                moveToward(cachedFriendlyLauncher.location);
+                return;
+            }
         }
         // If enemy reported recently that is close
         MapLocation enemyLocation = Comm.getEnemyLoc();
@@ -193,21 +218,7 @@ public class Launcher extends Unit {
                 // move toward enemy if sensed an enemy outside attack range
                 if (rc.isActionReady() && (ourTeamStrength >= 0 ||
                         (ourTeamStrength==0 && rc.getHealth() > closestEnemy.getHealth()))) {
-                    Direction forwardDir = rc.getLocation().directionTo(attackTarget);
-                    Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
-                            forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
-                    for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= ATTACK_DIS
-                                && rc.canMove(dir) &&
-                                (rc.senseCloud(rc.getLocation()) || // if in cloud can still move to cloud
-                                !rc.senseCloud(rc.getLocation().add(dir)))) { // if not in cloud dont go into cloud
-                            rc.move(dir);
-                            if (rc.canAttack(attackTarget)) {
-                                rc.attack(attackTarget);
-                            }
-                            break;
-                        }
-                    }
+                    chase(attackTarget);
                 } else {
                     // if at disadvantage pull back
                     if (closestEnemy != null) {
@@ -268,9 +279,34 @@ public class Launcher extends Unit {
         if (isSecondTime) {
             cachedTurn += 1;
             if (cachedTurn > 2) cachedAttackTarget = null;
+            if (rc.getRoundNum() - lastFriendSensedRound > 2) cachedFriendlyLauncher = null;
         }
     }
-
+    private static void chase(MapLocation loc) throws GameActionException{
+        Direction forwardDir = rc.getLocation().directionTo(attackTarget);
+        Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
+                forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
+        Direction result = null;
+        for (Direction dir : dirs) {
+            if (rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= ATTACK_DIS
+                    && rc.canMove(dir)) {
+                // extraCheck == 0: run; extraCheck==1 cache and run out of vision;
+                // extraCheck == 2: go to a loc that can still attack
+                if (result == null) result = dir;
+                if ((rc.getLocation().add(result).distanceSquaredTo(loc)
+                                < rc.getLocation().add(dir).distanceSquaredTo(loc))) {
+                    result = dir;
+                }
+            }
+        }
+        if (result != null){
+            rc.move(result);
+            if (rc.canAttack(attackTarget)) {
+                rc.attack(attackTarget);
+            }
+//            indicator += String.format("Chase%s", result);
+        }
+    }
     private static void kite(MapLocation loc, int extraChecks) throws GameActionException {
         Direction backDir = rc.getLocation().directionTo(loc).opposite();
         Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
@@ -293,7 +329,7 @@ public class Launcher extends Unit {
         }
         if (result != null){
             rc.move(result);
-            indicator += String.format("Kite%s", result);
+//            indicator += String.format("Kite%s", result);
             if (extraChecks == 1) cachedDirection = result.opposite();
         }
     }

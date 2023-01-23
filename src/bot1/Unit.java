@@ -33,9 +33,9 @@ public class Unit extends RobotPlayer {
         if (rc.isMovementReady() && dir != Direction.CENTER) {
             if (rc.canMove(dir) && canPass(dir)) {
                 rc.move(dir);
-            } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight())) {
+            } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight(), dir)) {
                 rc.move(dir.rotateRight());
-            } else if (rc.canMove(dir.rotateLeft()) && canPass(dir.rotateLeft())) {
+            } else if (rc.canMove(dir.rotateLeft()) && canPass(dir.rotateLeft(), dir)) {
                 rc.move(dir.rotateLeft());
             } else if (rc.canMove(dir.rotateRight().rotateRight())) {
                 rc.move(dir.rotateRight().rotateRight());
@@ -127,7 +127,7 @@ public class Unit extends RobotPlayer {
 
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
-                if (canPass(dir) || canPass(dir.rotateRight()) || canPass(dir.rotateLeft())) {
+                if (canPass(dir) || canPass(dir.rotateRight(), dir) || canPass(dir.rotateLeft(), dir)) {
                     tryMoveDir(dir);
                 } else {
                     //rng = new Random(rc.getID());
@@ -190,7 +190,7 @@ public class Unit extends RobotPlayer {
         lastPathingTurn = turnCount;
     }
 
-    static boolean canPass(Direction dir) throws GameActionException {
+    static boolean canPass(Direction dir, Direction targetDir) throws GameActionException {
         MapLocation loc = rc.getLocation().add(dir);
         if (!rc.onTheMap(loc))
             return false;
@@ -200,11 +200,17 @@ public class Unit extends RobotPlayer {
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null)
             return false;
-        // only allow empty carrier to go onto current for now
         Direction current = info.getCurrentDirection();
-        if (current == Direction.CENTER || current == dir || current == dir.rotateLeft() || current == dir.rotateRight())
+        // only allow currents blowing in the direction of the target direction
+        if (current == Direction.CENTER || current == targetDir
+                || current == targetDir.rotateLeft() || current == targetDir.rotateRight())
             return true;
+        // only allow empty carrier to go onto current for now
         return rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12;
+    }
+
+    static boolean canPass(Direction dir) throws GameActionException {
+        return canPass(dir, dir);
     }
 
     static Direction Dxy2dir(int dx, int dy) {

@@ -80,6 +80,7 @@ public class Unit extends RobotPlayer {
 
     // new path finding code from Ray
     private static final int PRV_LENGTH = 60;
+    private static final int TURNS_BEFORE_SWITCH = 10;
     private static Direction[] prv = new Direction[PRV_LENGTH];
     private static int pathingCnt = 0;
     private static MapLocation lastPathingTarget = null;
@@ -88,7 +89,7 @@ public class Unit extends RobotPlayer {
     private static int lastPathingTurn = 0;
     private static int currentTurnDir = 0;
     private static int currentTurnLen = 0;
-    private static int currentMaxTurnLen = 10;
+    private static int currentMaxTurnLen = TURNS_BEFORE_SWITCH;
     private static int lastmovecount = 0;
     static void moveToward(MapLocation location) throws GameActionException {
         // reset queue when target location changes or there's gap in between calls
@@ -136,8 +137,8 @@ public class Unit extends RobotPlayer {
 
             if (pathingCnt == 0) {
                 currentTurnLen = 0;
-                if (currentMaxTurnLen > 10 && lastmovecount > currentMaxTurnLen / 3) {
-                    currentMaxTurnLen = 10;
+                if (currentMaxTurnLen > TURNS_BEFORE_SWITCH && lastmovecount > currentMaxTurnLen / 3) {
+                    currentMaxTurnLen = TURNS_BEFORE_SWITCH;
                     currentTurnDir = 0;
                     lastmovecount = 0;
                 }

@@ -345,6 +345,7 @@ public class Comm extends RobotPlayer {
                 writeBits(SYM_BIT + sym, 1, 1);
             }
         }
+        needSymmetryReport = false;
     }
 
     public static void guessSym() {
@@ -355,7 +356,11 @@ public class Comm extends RobotPlayer {
                 symmetry = sym;
             }
         }
-        assert numPossible > 0;
+        if (numPossible == 0) {
+            System.out.println("impossible that no sym is correct, guess rotation");
+            symmetry = 0;
+            numPossible = 1;
+        }
         if (numPossible == 1) {
             isSymmetryConfirmed = true;
         } else {

@@ -67,7 +67,6 @@ public class MapRecorder extends RobotPlayer {
                 isSym = (val & SYM_MASK) == (symVal & SYM_MASK) && (symCurrent.ordinal() == (symVal & CURRENT_MASK));
                 if (!isSym) {
                     Comm.eliminateSym(sym);
-                    System.out.printf("sym %d elim at %s val %d symval %d\n", sym, info.getMapLocation(), val, symVal);
                 }
             }
             vals[x][y] = val;

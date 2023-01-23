@@ -24,12 +24,14 @@ public class Headquarter extends Unit {
             }
             Comm.commit_write();
             MapRecorder.hqInit();
-            if (Comm.friendlyHQLocations[0].equals(rc.getLocation())) {
+
+            // only sym scout at the start of game on big maps with at least 2 HQs
+            if (mapWidth * mapHeight >= 1600 && hqid == 1) {
                 trySpawn(RobotType.CARRIER, new MapLocation(mapWidth / 2, mapHeight / 2), Carrier.SCOUT_SYMMETRY);
             }
         }
 
-        if (!Comm.isSymmetryConfirmed && turnCount > 0 && turnCount % 150 == 0) {
+        if (!Comm.isSymmetryConfirmed && turnCount > 0 && turnCount % 300 == 0) {
             System.out.println("too long no sym, send another sym scout");
             trySpawn(RobotType.CARRIER, new MapLocation(mapWidth / 2, mapHeight / 2), Carrier.SCOUT_SYMMETRY);
         }
@@ -82,7 +84,7 @@ public class Headquarter extends Unit {
             lastEnemyRound = rc.getRoundNum();
         }
         Comm.reportCongest(hqid, isCongested);
-        indicator += String.format("local congest %b global congest %b", isCongested, Comm.isCongested());
+        indicator += String.format("sym good %b local congest %b global congest %b", Comm.isSymmetryConfirmed, isCongested, Comm.isCongested());
 
         boolean canBuildLauncher = true;
         if ((Comm.isCongested() || (rc.getRoundNum() > 1500 && rc.getRobotCount() / Comm.numHQ > 20))

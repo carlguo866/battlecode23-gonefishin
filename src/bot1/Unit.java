@@ -53,7 +53,7 @@ public class Unit extends RobotPlayer {
     static int getClosestID(MapLocation fromLocation, MapLocation[] locations) {
         int dis = Integer.MAX_VALUE;
         int rv = -1;
-        for (int i = 0; i < locations.length; i++) {
+        for (int i = locations.length; --i >= 0;) {
             MapLocation location = locations[i];
             if (location != null) {
                 int newDis = fromLocation.distanceSquaredTo(location);
@@ -76,6 +76,14 @@ public class Unit extends RobotPlayer {
     }
     static int getClosestDis(MapLocation[] locations) {
         return getClosestDis(rc.getLocation(), locations);
+    }
+
+    static MapLocation getClosestLoc(MapLocation fromLocation, MapLocation[] locations) {
+        return locations[getClosestID(fromLocation, locations)];
+    }
+
+    static MapLocation getClosestLoc(MapLocation[] locations) {
+        return getClosestLoc(rc.getLocation(), locations);
     }
 
     // new path finding code from Ray
@@ -223,9 +231,7 @@ public class Unit extends RobotPlayer {
         if (robot != null)
             return false;
         // disallow going into enemy HQ attack range when symmetry confirmed
-        if (Comm.isSymmetryConfirmed
-                && getClosestDis(Comm.enemyHQLocations) > 9
-                && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
+        if (getClosestDis(Comm.enemyHQLocations) > 9 && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
             return false;
         }
         Direction current = info.getCurrentDirection();

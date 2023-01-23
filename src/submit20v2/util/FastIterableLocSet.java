@@ -1,33 +1,41 @@
-// https://github.com/BSreenivas0713/Battlecode2022/blob/main/src/MPBasic/fast/FastLocIntMap.java
-package submit20.util;
+package submit20v2.util;
 
 import battlecode.common.MapLocation;
 
-public class FastLocIntMap {
+public class FastIterableLocSet {
     public StringBuilder keys;
+    public int maxlen;
+    public MapLocation[] locs;
     public int size;
     private int earliestRemoved;
 
-    public FastLocIntMap() {
+    public FastIterableLocSet() {
+        this(100);
+    }
+
+    public FastIterableLocSet(int len) {
         keys = new StringBuilder();
+        maxlen = len;
+        locs = new MapLocation[maxlen];
     }
 
     private String locToStr(MapLocation loc) {
         return "^" + (char)(loc.x) + (char)(loc.y);
     }
 
-    public void add(MapLocation loc, int val) {
+    public void add(MapLocation loc) {
         String key = locToStr(loc);
         if (keys.indexOf(key) == -1) {
-            keys.append(key + (char)(val + 0x100));
+            keys.append(key);
             size++;
         }
+
     }
 
-    public void add(int x, int y, int val) {
+    public void add(int x, int y) {
         String key = "^" + (char)x + (char)y;
         if (keys.indexOf(key) == -1) {
-            keys.append(key + (char)(val + 0x100));
+            keys.append(key);
             size++;
         }
     }
@@ -36,7 +44,7 @@ public class FastLocIntMap {
         String key = locToStr(loc);
         int index;
         if ((index = keys.indexOf(key)) >= 0) {
-            keys.delete(index, index + 4);
+            keys.delete(index, index + 3);
             size--;
 
             if(earliestRemoved > index)
@@ -48,7 +56,7 @@ public class FastLocIntMap {
         String key = "^" + (char)x + (char)y;
         int index;
         if ((index = keys.indexOf(key)) >= 0) {
-            keys.delete(index, index + 4);
+            keys.delete(index, index + 3);
             size--;
 
             if(earliestRemoved > index)
@@ -70,29 +78,15 @@ public class FastLocIntMap {
         earliestRemoved = 0;
     }
 
-    public int getVal(MapLocation loc) {
-        String key = locToStr(loc);
-        int idx = keys.indexOf(key);
-        if (idx != -1) {
-            return (int)keys.charAt(idx + 3) - 0x100;
+    public void updateIterable() {
+        for (int i = earliestRemoved / 3; i < size; i++) {
+            locs[i] = new MapLocation(keys.charAt(i*3+1), keys.charAt(i*3+2));
         }
-
-        return -1;
+        earliestRemoved = size * 3;
     }
 
-    public MapLocation[] getKeys() {
-        MapLocation[] locs = new MapLocation[size];
-        for(int i = 1; i < keys.length(); i += 4) {
-            locs[i/4] = new MapLocation((int)keys.charAt(i), (int)keys.charAt(i+1));
-        }
-        return locs;
-    }
-
-    public int[] getInts() {
-        int[] ints = new int[size];
-        for(int i = 3; i < keys.length(); i += 4) {
-            ints[i/4] = (int)keys.charAt(i) - 0x100;
-        }
-        return ints;
+    public void replace(String newSet) {
+        keys.replace(0, keys.length(), newSet);
+        size = newSet.length() / 3;
     }
 }

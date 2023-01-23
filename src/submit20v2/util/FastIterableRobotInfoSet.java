@@ -1,4 +1,4 @@
-package submit20.util;
+package submit20v2.util;
 
 import battlecode.common.MapLocation;
 import battlecode.common.RobotInfo;

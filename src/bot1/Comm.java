@@ -11,7 +11,7 @@ import battlecode.common.*;
  * 0-47: 4*2 6bits int specifying the coord of friendly HQs
  * 48-50: 3 bit whether symmetries of the map have been eliminated:
  * [ROTATIONAL, VERTIAL, HORIZONTAL]
- * 51-54: 4 bits indicating whether the 4 HQs are congested
+ * 64-67: 4 bits indicating whether the 4 HQs are congested
  *
  * well info 96-203 bits
  * wells info starting bit 96 of 3 types, each 36 bits total 108 bits
@@ -36,12 +36,16 @@ import battlecode.common.*;
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int SYM_BIT = 48;
-    private static final int CONGEST_BIT = 51;
+    private static final int CONGEST_BIT = 64;
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 487;
     private static final int ISLAND_BIT = 511;
 
+    public static final int ISLAND_NEUTRAL = 0;
+    public static final int ISLAND_FRIENDLY = 1;
+    public static final int ISLAND_ENEMY = 2;
+    public static final int ISLAND_ON_THE_WAY = 3; // carrier is on the way
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -110,6 +114,7 @@ public class Comm extends RobotPlayer {
             if (friendlyHQLocations[i] == null) {
                 friendlyHQLocations[i] = location;
                 writeBits(i * 12, 12, loc2int(location));
+                numHQ = i + 1;
                 return i;
             }
         }
@@ -257,14 +262,18 @@ public class Comm extends RobotPlayer {
         System.out.println("ISLAND NOT FOUND IN COMM");
         return 36;
     }
-    public static int getIslandStatus(MapLocation loc) {
-        int index = getIslandIndex(loc);
-        return readBits(ISLAND_BIT + (index-1) * 14, 14) % 4;
+
+    public static MapLocation getIslandLocation(int index) {
+        return int2loc(readBits(ISLAND_BIT + (index - 1) * 14, 12));
+    }
+
+    public static int getIslandStatus(int index) {
+        return readBits(ISLAND_BIT + (index - 1) * 14 + 12, 2);
     }
 
     public static void reportIsland(MapLocation loc, int index, int status) throws GameActionException{
         //storing island index i at (i-1) since island indexes starts at 1
-        int val = readBits(ISLAND_BIT + (index-1) * 14, 14);
+        int val = readBits(ISLAND_BIT + (index - 1) * 14, 14);
         if (val != 0 && val % 4 == status) {
             return;
         }
@@ -278,12 +287,12 @@ public class Comm extends RobotPlayer {
     public static MapLocation getClosestIsland() {
         MapLocation targetLoc = null;
         int dis = Integer.MAX_VALUE;
-        for (int i = 0; i < 35; i++) {
+        for (int i = 0; i < islandCount; i++) {
             int val = readBits(ISLAND_BIT + i * 14, 14);
-            if (val == 0 || val % 4 != 0) {
+            if (val == 0 || val % 4 == ISLAND_FRIENDLY) {
                 continue;
             }
-            MapLocation loc = int2loc((val - val % 4) / 4);
+            MapLocation loc = int2loc(val >> 2);
             if (rc.getLocation().distanceSquaredTo(loc) < dis) {
                 targetLoc = loc;
                 dis = rc.getLocation().distanceSquaredTo(loc);

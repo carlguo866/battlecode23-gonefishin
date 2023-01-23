@@ -1,7 +1,7 @@
-package submit20;
+package submit20v2;
 
 import battlecode.common.*;
-import submit20.util.FastIterableLocSet;
+import submit20v2.util.FastIterableLocSet;
 
 public class MapRecorder extends RobotPlayer {
     // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting

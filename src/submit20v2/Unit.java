@@ -1,4 +1,4 @@
-package submit20;
+package submit20v2;
 
 import battlecode.common.*;
 
@@ -33,9 +33,9 @@ public class Unit extends RobotPlayer {
         if (rc.isMovementReady() && dir != Direction.CENTER) {
             if (rc.canMove(dir) && canPass(dir)) {
                 rc.move(dir);
-            } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight())) {
+            } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight(), dir)) {
                 rc.move(dir.rotateRight());
-            } else if (rc.canMove(dir.rotateLeft()) && canPass(dir.rotateLeft())) {
+            } else if (rc.canMove(dir.rotateLeft()) && canPass(dir.rotateLeft(), dir)) {
                 rc.move(dir.rotateLeft());
             } else if (rc.canMove(dir.rotateRight().rotateRight())) {
                 rc.move(dir.rotateRight().rotateRight());
@@ -94,12 +94,11 @@ public class Unit extends RobotPlayer {
         if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 1) {
             pathingCnt = 0;
         }
-        indicator += String.format("cnt%d,", pathingCnt);
-        lastPathingTarget = location;
-        lastPathingTurn = turnCount;
+        indicator += String.format("2%sc%ds%d,", location, pathingCnt, stuckCnt);
 
         if (rc.isMovementReady()) {
-            if (rc.getLocation().equals(lastLocation)) {
+            // we increase stuck count only if it's a new turn (optim for empty carriers)
+            if (rc.getLocation().equals(lastLocation) && turnCount != lastPathingTurn) {
                 stuckCnt += 1;
             } else {
                 stuckCnt = 0;
@@ -110,13 +109,25 @@ public class Unit extends RobotPlayer {
                 randomMove();
                 pathingCnt = 0;
             }
-            if (stuckCnt >= 8) {
-                rc.disintegrate();
+            if (stuckCnt >= 10) {
+                // make sure if it's a carrier on a well, wait 40 turns
+                do {
+                    if (rc.getType() == RobotType.CARRIER && rc.getWeight() == GameConstants.CARRIER_CAPACITY) {
+                        if (rc.senseWell(rc.getLocation()) != null || stuckCnt < 20) {
+                            break; // a carrier on a well should never disintegrate, a carrier with max resource gets extra time
+                        }
+                        if (rc.getNumAnchors(Anchor.STANDARD) == 1 && stuckCnt < 40) {
+                            break; // a carrier trying having an anchor gets extra time
+                        }
+                    }
+                    System.out.printf("loc %s disintegrate due to stuck\n", rc.getLocation());
+                    rc.disintegrate();
+                } while (false);
             }
 
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
-                if (canPass(dir) || canPass(dir.rotateRight()) || canPass(dir.rotateLeft())) {
+                if (canPass(dir) || canPass(dir.rotateRight(), dir) || canPass(dir.rotateLeft(), dir)) {
                     tryMoveDir(dir);
                 } else {
                     //rng = new Random(rc.getID());
@@ -174,9 +185,12 @@ public class Unit extends RobotPlayer {
                 }
             }
         }
+
+        lastPathingTarget = location;
+        lastPathingTurn = turnCount;
     }
 
-    static boolean canPass(Direction dir) throws GameActionException {
+    static boolean canPass(Direction dir, Direction targetDir) throws GameActionException {
         MapLocation loc = rc.getLocation().add(dir);
         if (!rc.onTheMap(loc))
             return false;
@@ -186,11 +200,17 @@ public class Unit extends RobotPlayer {
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null)
             return false;
-        // only allow empty carrier to go onto current for now
         Direction current = info.getCurrentDirection();
-        if (current == Direction.CENTER || current == dir || current == dir.rotateLeft() || current == dir.rotateRight())
+        // only allow currents blowing in the direction of the target direction
+        if (current == Direction.CENTER || current == targetDir
+                || current == targetDir.rotateLeft() || current == targetDir.rotateRight())
             return true;
+        // only allow empty carrier to go onto current for now
         return rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12;
+    }
+
+    static boolean canPass(Direction dir) throws GameActionException {
+        return canPass(dir, dir);
     }
 
     static Direction Dxy2dir(int dx, int dy) {

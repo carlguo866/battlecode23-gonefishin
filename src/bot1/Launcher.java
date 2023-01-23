@@ -64,8 +64,6 @@ public class Launcher extends Unit {
         }
         sense(false);
         micro(false);
-//        indicator += String.format("actCool%d", rc.getActionCooldownTurns());
-//        indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
         macro();
         if (rc.isActionReady()){
             sense(false);
@@ -160,7 +158,7 @@ public class Launcher extends Unit {
         if (friendlyLaunchers.size != 0) {
             cachedFriendlyLauncher = closestFriendlyLauncher;
         }
-        indicator += String.format("Strength%d", ourTeamStrength);
+        indicator += String.format("S%d", ourTeamStrength);
     }
 
     static void macro() throws GameActionException{
@@ -195,7 +193,7 @@ public class Launcher extends Unit {
             }
         } else {
             // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
-            if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
+            if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
                 for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
                     if (Comm.enemyHQLocations[i % 4] != null) {
                         enemyHQID = i % 4;

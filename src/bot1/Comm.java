@@ -262,14 +262,18 @@ public class Comm extends RobotPlayer {
         System.out.println("ISLAND NOT FOUND IN COMM");
         return 36;
     }
-    public static int getIslandStatus(MapLocation loc) {
-        int index = getIslandIndex(loc);
-        return readBits(ISLAND_BIT + (index-1) * 14, 14) % 4;
+
+    public static MapLocation getIslandLocation(int index) {
+        return int2loc(readBits(ISLAND_BIT + (index - 1) * 14, 12));
+    }
+
+    public static int getIslandStatus(int index) {
+        return readBits(ISLAND_BIT + (index - 1) * 14 + 12, 2);
     }
 
     public static void reportIsland(MapLocation loc, int index, int status) throws GameActionException{
         //storing island index i at (i-1) since island indexes starts at 1
-        int val = readBits(ISLAND_BIT + (index-1) * 14, 14);
+        int val = readBits(ISLAND_BIT + (index - 1) * 14, 14);
         if (val != 0 && val % 4 == status) {
             return;
         }
@@ -283,12 +287,12 @@ public class Comm extends RobotPlayer {
     public static MapLocation getClosestIsland() {
         MapLocation targetLoc = null;
         int dis = Integer.MAX_VALUE;
-        for (int i = 0; i < 35; i++) {
+        for (int i = 0; i < islandCount; i++) {
             int val = readBits(ISLAND_BIT + i * 14, 14);
-            if (val == 0 || val % 4 != 0) {
+            if (val == 0 || val % 4 == ISLAND_FRIENDLY) {
                 continue;
             }
-            MapLocation loc = int2loc((val - val % 4) / 4);
+            MapLocation loc = int2loc(val >> 2);
             if (rc.getLocation().distanceSquaredTo(loc) < dis) {
                 targetLoc = loc;
                 dis = rc.getLocation().distanceSquaredTo(loc);

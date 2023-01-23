@@ -60,7 +60,8 @@ public class Headquarter extends Unit {
         if (((friendlyCount > sensablePassibleArea / 2 && friendlyCount > 10)
                 || (spawnableTileOccupied > spawnableSet.size / 2 && spawnableTileOccupied > 5)
                 || friendlyCount > 30
-                || spawnableTileOccupied > 12)
+                || spawnableTileOccupied > 12
+                || rc.getRobotCount() / Comm.numHQ > 80)
                 && rc.getRoundNum() > 100
                 && rc.getRobotCount() / Comm.numHQ > 30) {
             lastCongestedRound = rc.getRoundNum();
@@ -84,7 +85,7 @@ public class Headquarter extends Unit {
         indicator += String.format("local congest %b global congest %b", isCongested, Comm.isCongested());
 
         boolean canBuildLauncher = true;
-        if (Comm.isCongested()
+        if ((Comm.isCongested() || (rc.getRoundNum() > 1500 && rc.getRobotCount() / Comm.numHQ > 20))
                 && rc.getRoundNum() - lastEnemyRound > 50
                 && rc.getNumAnchors(Anchor.STANDARD) == 0
                 && rc.getRoundNum() - lastRoundAnchorBuilt > 50) {

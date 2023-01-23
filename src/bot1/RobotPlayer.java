@@ -13,6 +13,7 @@ import battlecode.common.*;
 public strictfp class RobotPlayer {
     static RobotController rc;
     static int turnCount;
+    static int islandCount;
 
     static int mapWidth, mapHeight;
 
@@ -36,6 +37,7 @@ public strictfp class RobotPlayer {
         oppTeam = rc.getTeam().opponent();
         mapWidth = rc.getMapWidth();
         mapHeight = rc.getMapHeight();
+        islandCount = rc.getIslandCount();
         turnCount = 0;
 
         while (true) {

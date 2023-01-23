@@ -58,12 +58,12 @@ public class Carrier extends Unit {
             wellsToReport[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(10);
 
             //0: unoccupied island; 1: us-occupied island; 2: enemy-occupied island
-            islandsSeen[0] = new FastIterableLocSet(35);
-            islandsToReport[0] = new FastIterableLocSet(35);
-            islandsSeen[1] = new FastIterableLocSet(26);
-            islandsToReport[1] = new FastIterableLocSet(26);
-            islandsSeen[2] = new FastIterableLocSet(26);
-            islandsToReport[2] = new FastIterableLocSet(26);
+            islandsSeen[Comm.ISLAND_NEUTRAL] = new FastIterableLocSet(35);
+            islandsToReport[Comm.ISLAND_NEUTRAL] = new FastIterableLocSet(35);
+            islandsSeen[Comm.ISLAND_FRIENDLY] = new FastIterableLocSet(35);
+            islandsToReport[Comm.ISLAND_FRIENDLY] = new FastIterableLocSet(35);
+            islandsSeen[Comm.ISLAND_ENEMY] = new FastIterableLocSet(35);
+            islandsToReport[Comm.ISLAND_ENEMY] = new FastIterableLocSet(35);
 
             startHQID = getClosestID(Comm.friendlyHQLocations);
             startHQLoc = Comm.friendlyHQLocations[startHQID];
@@ -203,35 +203,60 @@ public class Carrier extends Unit {
             }
         }
     }
-    private static MapLocation anchortarget;
+
+    private static MapLocation targetLoc;
+    private static int targetIslandIndex = -1;
     private static void anchor() throws GameActionException {
-        indicator += "anchoring";
-        if (anchortarget != null) {
-            if ((anchortarget.x == rc.getLocation().x) && (anchortarget.y == rc.getLocation().y)) {
-                //System.out.println(anchortarget);
-                if (rc.canPlaceAnchor()) {                    
-                    rc.placeAnchor();
-                    tryFindMine();
-                    anchortarget = null;
-                    //Comm.reportIsland(anchortarget, Comm.getIslandIndex(anchortarget), 1);
-                }
-                return;
-            }
-            int status = Comm.getIslandStatus(anchortarget);
-            if (status == 3) {
-                moveToward(anchortarget);
-                return ;
+        int currentIslandIndex = rc.senseIsland(rc.getLocation());
+        if (currentIslandIndex != -1 && rc.senseTeamOccupyingIsland(currentIslandIndex) == Team.NEUTRAL) {
+            if (rc.canPlaceAnchor()) {
+                rc.placeAnchor();
+                // on island so must can report
+                Comm.reportIsland(rc.getLocation(), currentIslandIndex, Comm.ISLAND_FRIENDLY);
+                tryFindMine();
             }
         }
-        MapLocation targetLoc = Comm.getClosestIsland();
+
+        // if visually see a target, focus on that first
+        int[] islands = rc.senseNearbyIslands();
+        int dis = targetLoc == null? Integer.MAX_VALUE : targetLoc.distanceSquaredTo(rc.getLocation());
+        for (int island : islands) {
+            if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
+                if (island == targetIslandIndex) {
+                    // the original target is not placable anymore
+                    targetIslandIndex = -1;
+                    targetLoc = null;
+                }
+                continue; // we can't place here
+            }
+            MapLocation locs[] = rc.senseNearbyIslandLocations(island);
+            for (MapLocation loc : locs) {
+                if (rc.getLocation().distanceSquaredTo(loc) < dis) {
+                    targetLoc = loc;
+                    targetIslandIndex = island;
+                    dis = rc.getLocation().distanceSquaredTo(loc);
+                }
+            }
+        }
+
+        // otherwise try to find target from Comm
+        if (targetLoc == null) {
+            for (int i = 1; i <= islandCount; i++) {
+                MapLocation islandLocation = Comm.getIslandLocation(i);
+                if (islandLocation != null && Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL) {
+                    int islandDis = islandLocation.distanceSquaredTo(rc.getLocation());
+                    if (islandDis < dis) {
+                        dis = islandDis;
+                        targetLoc = islandLocation;
+                        targetIslandIndex = i;
+                    }
+                }
+            }
+        }
+
         if (targetLoc == null) {
             randomMove();
         } else {
-            anchortarget = targetLoc;
-            System.out.print("Putting anchor at ");
-            System.out.println(anchortarget);
-            Comm.reportIsland(targetLoc, Comm.getIslandIndex(targetLoc), 3);
-            indicator += targetLoc;
             moveToward(targetLoc);
         }
     }
@@ -478,7 +503,6 @@ public class Carrier extends Unit {
             if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
                 collect();
             }
-            indicator += String.format("2%s", miningWellLoc);
         }
     }
 
@@ -487,7 +511,6 @@ public class Carrier extends Unit {
         int mn = rc.getResourceAmount(ResourceType.MANA);
         if (!rc.getLocation().isAdjacentTo(miningHQLoc)) {
             moveToward(miningHQLoc);
-            indicator += String.format("2%s", miningHQLoc);
         }
         if (rc.getLocation().isAdjacentTo(miningHQLoc)) {
             if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {

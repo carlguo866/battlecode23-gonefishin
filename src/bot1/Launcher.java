@@ -23,10 +23,10 @@ public class Launcher extends Unit {
     }
 
     static boolean checkWall(MapLocation start, MapLocation end) throws GameActionException{
-        MapLocation iter = start;
+        MapLocation iter = start.add(start.directionTo(end));
         int hardstop = 0;
-        while (!iter.equals(end) && hardstop < 4){
-            if (!rc.sensePassability(iter.add(iter.directionTo(end)))) return true;
+        while (rc.canSenseLocation(iter) && !iter.equals(end) && hardstop < 4){
+            if (!rc.sensePassability(iter)) return true;
             iter = iter.add(iter.directionTo(end));
             hardstop++;
         }
@@ -58,6 +58,7 @@ public class Launcher extends Unit {
     static RobotType attackTargetType;
     static RobotInfo closestEnemy = null;
     static int ourTeamStrength = 1;
+    static int ourTeamHealth = 0;
     static int closeFriendsSize = 0; 
 
     // macro vars
@@ -93,6 +94,7 @@ public class Launcher extends Unit {
         // macro vars
         int dis = 0;
         closestFriendlyLauncher = null;
+        ourTeamHealth = (int) Math.ceil((double) rc.getHealth() / DAMAGE) ;
         friendlyLaunchers.clear();
         enemyLaunchers.clear();
         attackTargetHealth = (int) Math.ceil((double) 250 / DAMAGE);
@@ -101,16 +103,15 @@ public class Launcher extends Unit {
                 if (robot.type == RobotType.LAUNCHER) {
                     if (friendlyLaunchers.size < 6)
                         friendlyLaunchers.add(robot);
+                        if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4 ||
+                                (checkWall(rc.getLocation(), robot.getLocation())
+                                        && betterDistance(rc.getLocation(), robot.getLocation()) <= 9)){
+    //                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
+    //                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
+                            closeFriendsSize+=1;
+                            ourTeamHealth += (int) Math.ceil((double) robot.getHealth() / DAMAGE);
+                        }
                     ourTeamStrength += 1;
-                    if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4){
-//                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
-//                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
-                        closeFriendsSize+=1;
-                    } else if (checkWall(rc.getLocation(), robot.getLocation())
-                            && betterDistance(rc.getLocation(), robot.getLocation()) <= 9){
-                        closeFriendsSize+=1;
-                        System.out.println("walllll");
-                    }
 
                     if (closestFriendlyLauncher == null) {
                         closestFriendlyLauncher = robot;
@@ -131,6 +132,7 @@ public class Launcher extends Unit {
                     groupingAttempt = 0;
                     enemyLaunchers.add(robot);
                     ourTeamStrength -= 1;
+                    ourTeamHealth -= (int) Math.ceil((double) robot.getHealth() / DAMAGE);
                     lastEnemySensedRound = rc.getRoundNum();
                 } else {
                     int health = (int) Math.ceil((double) robot.health / DAMAGE);
@@ -243,7 +245,8 @@ public class Launcher extends Unit {
                 } else {
                     // if at disadvantage pull back
                     if (closestEnemy != null) {
-                        if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health){
+                        if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health
+                            || (ourTeamStrength == 0 && ourTeamHealth < 0)){
                             indicator += String.format("run%d", closestEnemy.health-rc.getHealth());
                             //run
                             kite(closestEnemy.location, 0);

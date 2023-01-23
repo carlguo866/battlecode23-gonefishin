@@ -87,11 +87,12 @@ public class Unit extends RobotPlayer {
     private static int stuckCnt = 0;
     private static int lastPathingTurn = 0;
     private static int currentTurnDir = 0;
-    private static Random rng;
-
+    private static int currentTurnLen = 0;
+    private static int currentMaxTurnLen = 10;
+    private static int lastmovecount = 0;
     static void moveToward(MapLocation location) throws GameActionException {
         // reset queue when target location changes or there's gap in between calls
-        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 1) {
+        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 2) {
             pathingCnt = 0;
         }
         indicator += String.format("2%sc%ds%d,", location, pathingCnt, stuckCnt);
@@ -125,7 +126,21 @@ public class Unit extends RobotPlayer {
                 } while (false);
             }
 
+            if (currentTurnLen >= currentMaxTurnLen) {
+                currentTurnLen = 0;
+                pathingCnt = 0;
+                currentTurnDir = (currentTurnDir + 1) % 2;
+                currentMaxTurnLen = currentMaxTurnLen * 3;
+                lastmovecount = 0;
+            }
+
             if (pathingCnt == 0) {
+                currentTurnLen = 0;
+                if (currentMaxTurnLen > 10 && lastmovecount > currentMaxTurnLen / 3) {
+                    currentMaxTurnLen = 10;
+                    currentTurnDir = 0;
+                    lastmovecount = 0;
+                }
                 Direction dir = rc.getLocation().directionTo(location);
                 if (canPass(dir) || canPass(dir.rotateRight(), dir) || canPass(dir.rotateLeft(), dir)) {
                     tryMoveDir(dir);
@@ -142,6 +157,8 @@ public class Unit extends RobotPlayer {
                         indicator += "permblocked";
                         randomMove();
                     } else if (rc.canMove(dir)) {
+                        currentTurnLen++;
+                        lastmovecount++;
                         rc.move(dir);
                     }
                 }
@@ -160,6 +177,8 @@ public class Unit extends RobotPlayer {
                     }
                     Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
                     if (rc.canMove(moveDir)) {
+                        currentTurnLen++;
+                        lastmovecount++;
                         rc.move(moveDir);
                     } else {
                         // a robot blocking us while we are following wall, wait
@@ -177,6 +196,8 @@ public class Unit extends RobotPlayer {
                     }
                     Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateRight();
                     if (rc.canMove(moveDir)) {
+                        currentTurnLen++;
+                        lastmovecount++;
                         rc.move(moveDir);
                     } else {
                         // a robot blocking us while we are following wall, wait

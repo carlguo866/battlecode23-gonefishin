@@ -88,7 +88,7 @@ public class Unit extends RobotPlayer {
 
     // new path finding code from Ray
     private static final int PRV_LENGTH = 60;
-    private static final int TURNS_BEFORE_SWITCH = 10;
+    private static final int TURNS_BEFORE_SWITCH = 15;
     private static Direction[] prv = new Direction[PRV_LENGTH];
     private static int pathingCnt = 0;
     private static MapLocation lastPathingTarget = null;

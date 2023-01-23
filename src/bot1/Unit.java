@@ -53,7 +53,7 @@ public class Unit extends RobotPlayer {
     static int getClosestID(MapLocation fromLocation, MapLocation[] locations) {
         int dis = Integer.MAX_VALUE;
         int rv = -1;
-        for (int i = 0; i < locations.length; i++) {
+        for (int i = locations.length; --i >= 0;) {
             MapLocation location = locations[i];
             if (location != null) {
                 int newDis = fromLocation.distanceSquaredTo(location);
@@ -78,6 +78,14 @@ public class Unit extends RobotPlayer {
         return getClosestDis(rc.getLocation(), locations);
     }
 
+    static MapLocation getClosestLoc(MapLocation fromLocation, MapLocation[] locations) {
+        return locations[getClosestID(fromLocation, locations)];
+    }
+
+    static MapLocation getClosestLoc(MapLocation[] locations) {
+        return getClosestLoc(rc.getLocation(), locations);
+    }
+
     // new path finding code from Ray
     private static final int PRV_LENGTH = 60;
     private static Direction[] prv = new Direction[PRV_LENGTH];
@@ -91,7 +99,7 @@ public class Unit extends RobotPlayer {
 
     static void moveToward(MapLocation location) throws GameActionException {
         // reset queue when target location changes or there's gap in between calls
-        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 1) {
+        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 2) {
             pathingCnt = 0;
         }
         indicator += String.format("2%sc%ds%d,", location, pathingCnt, stuckCnt);
@@ -201,9 +209,7 @@ public class Unit extends RobotPlayer {
         if (robot != null)
             return false;
         // disallow going into enemy HQ attack range when symmetry confirmed
-        if (Comm.isSymmetryConfirmed
-                && getClosestDis(Comm.enemyHQLocations) > 9
-                && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
+        if (getClosestDis(Comm.enemyHQLocations) > 9 && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
             return false;
         }
         Direction current = info.getCurrentDirection();

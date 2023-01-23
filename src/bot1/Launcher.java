@@ -84,6 +84,17 @@ public class Launcher extends Unit {
             sense(false);
             micro(true);
         }
+        // have launchers perform sym check
+        if (!Comm.isSymmetryConfirmed) {
+            MapLocation symGuessLoc = getClosestLoc(Comm.enemyHQLocations);
+            if (rc.canSenseLocation(symGuessLoc)) {
+                RobotInfo hq = rc.senseRobotAtLocation(symGuessLoc);
+                if (hq == null || hq.type != RobotType.HEADQUARTERS || hq.team != oppTeam) {
+                    Comm.eliminateSym(Comm.symmetry);
+                }
+            }
+            MapRecorder.recordSym(500);
+        }
     }
 
     static void sense(boolean isSecondTime) throws GameActionException {
@@ -126,7 +137,10 @@ public class Launcher extends Unit {
                 }
             } else {
                 if (robot.type == RobotType.HEADQUARTERS) {
-                    // disregard enemy HQ
+                    // if I found an enemy HQ not at the position of the guessed sym, sym must be wrong
+                    if (!Comm.isSymmetryConfirmed && getClosestDis(robot.location, Comm.enemyHQLocations) != 0) {
+                        Comm.eliminateSym(Comm.symmetry);
+                    }
                     continue;
                 } else if (robot.type == RobotType.LAUNCHER) {
                     groupingAttempt = 0;
@@ -186,6 +200,16 @@ public class Launcher extends Unit {
     static void macro() throws GameActionException{
         if (!rc.isMovementReady()) {
             return;
+        }
+        if (Comm.isSymmetryConfirmed && Comm.needSymmetryReport && rc.getID() % 4 == 0) {
+            if (rc.canWriteSharedArray(0, 0)) {
+                Comm.reportSym();
+                Comm.commit_write();
+            } else if (rc.getID() % 4 == 0) { // only have a quarter of launchers go back to report
+                moveToward(getClosestLoc(Comm.friendlyHQLocations));
+                indicator += "gotsym";
+                return;
+            }
         }
         indicator += String.format("size%d", closeFriendsSize);
 //        if (closestFriendlyLauncher != null) {

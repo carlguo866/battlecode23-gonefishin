@@ -58,9 +58,9 @@ public class Headquarter extends Unit {
         }
         // congestion detection
         if (((friendlyCount > sensablePassibleArea / 2 && friendlyCount > 10)
-                || (spawnableTileOccupied > spawnableSet.size / 2 && spawnableTileOccupied > 5))
+                || (spawnableTileOccupied > spawnableSet.size / 2 && spawnableTileOccupied > 5)
                 || friendlyCount > 30
-                || spawnableTileOccupied > 12
+                || spawnableTileOccupied > 12)
                 && rc.getRoundNum() > 100
                 && rc.getRobotCount() / Comm.numHQ > 30) {
             lastCongestedRound = rc.getRoundNum();
@@ -81,18 +81,31 @@ public class Headquarter extends Unit {
             lastEnemyRound = rc.getRoundNum();
         }
         Comm.reportCongest(hqid, isCongested);
-        indicator += String.format("enemy %s round %d congest %b", Comm.getEnemyLoc(), Comm.getEnemyRound(), isCongested);
+        indicator += String.format("local congest %b global congest %b", isCongested, Comm.isCongested());
 
+        boolean canBuildLauncher = true;
         if (Comm.isCongested()
                 && rc.getRoundNum() - lastEnemyRound > 50
-                && rc.canBuildAnchor(Anchor.STANDARD)
                 && rc.getNumAnchors(Anchor.STANDARD) == 0
                 && rc.getRoundNum() - lastRoundAnchorBuilt > 50) {
-            rc.buildAnchor(Anchor.STANDARD);
-            lastRoundAnchorBuilt = rc.getRoundNum();
+            if (rc.canBuildAnchor(Anchor.STANDARD)) {
+                rc.buildAnchor(Anchor.STANDARD);
+                lastRoundAnchorBuilt = rc.getRoundNum();
+            } else {
+                canBuildLauncher = false;
+            }
         }
+        if (rc.getRoundNum() - lastEnemyRound > 5 && rc.getRobotCount() / Comm.numHQ > 80) {
+            canBuildLauncher = false;
+        }
+
+        boolean canBuildCarrier = true;
+        if (rc.getRoundNum() - lastEnemyRound <= 5 || Comm.isCongested()) {
+            canBuildCarrier = false;
+        }
+
         int maxLauncherSpawn = Math.max(5, rc.getResourceAmount(ResourceType.MANA) / Constants.LAUNCHER_COST_MN);
-        if (maxLauncherSpawn > enemyCount || turnCount == 0) {
+        if (canBuildLauncher && (maxLauncherSpawn > enemyCount || turnCount == 0)) {
             // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
             for (int i = 5; --i >= 0
                     && rc.isActionReady()
@@ -100,7 +113,7 @@ public class Headquarter extends Unit {
                 trySpawn(RobotType.LAUNCHER, new MapLocation(mapWidth / 2, mapHeight / 2), -1);
             }
         }
-        if (!Comm.isCongested() && closestEnemy == null) {
+        if (canBuildCarrier) {
             // do not spawn miner if enemies are close as miners getting killed will mess up spanw Q
             for (int i = 5; --i >= 0
                     && rc.isActionReady()

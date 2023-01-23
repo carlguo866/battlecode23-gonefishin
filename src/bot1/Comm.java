@@ -42,6 +42,10 @@ public class Comm extends RobotPlayer {
     private static final int ENEMY_BIT = 487;
     private static final int ISLAND_BIT = 511;
 
+    public static final int ISLAND_NEUTRAL = 0;
+    public static final int ISLAND_FRIENDLY = 1;
+    public static final int ISLAND_ENEMY = 2;
+    public static final int ISLAND_ON_THE_WAY = 3; // carrier is on the way
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
@@ -110,6 +114,7 @@ public class Comm extends RobotPlayer {
             if (friendlyHQLocations[i] == null) {
                 friendlyHQLocations[i] = location;
                 writeBits(i * 12, 12, loc2int(location));
+                numHQ = i + 1;
                 return i;
             }
         }

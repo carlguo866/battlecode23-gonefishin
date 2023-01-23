@@ -55,8 +55,8 @@ public class Launcher extends Unit {
         }
         sense();
         micro(false);
-        indicator += String.format("actCool%d", rc.getActionCooldownTurns());
-        indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
+        indicator += String.format("acd%d", rc.getActionCooldownTurns());
+        indicator += String.format("mcd%d", rc.getMovementCooldownTurns());
         if (rc.isMovementReady() && attackTarget == null) { // macro
             // If enemy reported recently that is close
             MapLocation enemyLocation = Comm.getEnemyLoc();
@@ -69,7 +69,6 @@ public class Launcher extends Unit {
                     clearedUntilRound = rc.getRoundNum();
                 } else {
                     moveToward(enemyLocation);
-                    indicator += String.format("M2E@%s", enemyLocation);
                 }
             } else {
                 // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
@@ -82,7 +81,6 @@ public class Launcher extends Unit {
                     }
                 }
                 enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
-                indicator += String.format("M2EHQ@%s", enemyHQLoc);
                 moveToward(enemyHQLoc);
             }
         }
@@ -171,7 +169,7 @@ public class Launcher extends Unit {
                     ourTeamStrength -=1;
             }
         }
-        indicator += String.format("Strength%d", ourTeamStrength);
+        indicator += String.format("S%d", ourTeamStrength);
     }
 
     static void micro(boolean isSecondTime) throws GameActionException {

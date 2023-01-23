@@ -1,7 +1,7 @@
-package bot1;
+package submit16;
 
 import battlecode.common.*;
-import bot1.util.FastIterableRobotInfoSet;
+import submit16.util.FastIterableRobotInfoSet;
 
 import java.util.AbstractMap;
 
@@ -130,17 +130,14 @@ public class Launcher extends Unit {
                         if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health){
                             indicator += String.format("run%d", closestEnemy.health-rc.getHealth());
                             kite(closestEnemy.location, 0);
-                        } else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady()){
-//                            System.out.println("scenario1111111");
-                            kite(attackTarget, 1);
                         }
+                        else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady())
+                            kite(attackTarget, 1);
                     } else if (ourTeamStrength == 0 && attackTargetType == RobotType.LAUNCHER) {
-//                        System.out.println("scenario22222");
                         // if I can back off to a location that I can still attack from, kite back
                         kite(attackTarget, 2);
                     } else if (ourTeamStrength == -1 && attackTargetType == RobotType.LAUNCHER
                             && attackTargetHealth > 2) {
-//                        System.out.println("scenario33333");
                         // if I can back off to a location that I can still attack from, kite back
                         kite(attackTarget, 1);
                     }

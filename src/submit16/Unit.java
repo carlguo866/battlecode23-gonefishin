@@ -1,4 +1,4 @@
-package launcher;
+package submit16;
 
 import battlecode.common.*;
 
@@ -28,7 +28,7 @@ public class Unit extends RobotPlayer {
     }
 
     static void tryMoveDir(Direction dir) throws GameActionException {
-        if (rc.isMovementReady() && dir != Direction.CENTER) {
+        if (rc.isMovementReady()) {
             if (rc.canMove(dir) && canPass(dir)) {
                 rc.move(dir);
             } else if (rc.canMove(dir.rotateRight()) && canPass(dir.rotateRight())) {

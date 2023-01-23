@@ -2,8 +2,11 @@ package launcher;
 
 import battlecode.common.*;
 import launcher.util.FastIterableRobotInfoSet;
+import launcher.util.SimpleLauncherInfo;
 
 import java.util.AbstractMap;
+import java.util.Map;
+import java.util.Random;
 
 public class Launcher extends Unit {
 
@@ -20,6 +23,9 @@ public class Launcher extends Unit {
 
     // micro vars
     static MapLocation attackTarget = null;
+
+    static SimpleLauncherInfo cachedAttackTarget = null;
+    static int cachedTurn = 0;
     static int attackTargetHealth;
     static RobotType attackTargetType;
     static RobotInfo closestEnemy = null;
@@ -27,7 +33,7 @@ public class Launcher extends Unit {
     // macro vars
     static RobotInfo masterLauncher = null;
     static int dis = 0;
-//    static int friendlyLauncherCnt = 1;
+    //    static int friendlyLauncherCnt = 1;
     static RobotInfo furthestFriendlyLauncher = null;
 
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
@@ -52,9 +58,11 @@ public class Launcher extends Unit {
                 if (robot.type == RobotType.LAUNCHER) {
 //                    ourTeamStrength += 2;
 //                    friendlyLauncherCnt += 1;
-                    if (friendlyLaunchers.size < 8)
+                    if (friendlyLaunchers.size < 6)
                         friendlyLaunchers.add(robot);
+//                    if (robot.location.distanceSquaredTo(rc.getLocation()) <= 10){
                     ourTeamStrength += 1;
+//                    }
                     if (furthestFriendlyLauncher == null) {
                         int newDis = robot.getLocation().distanceSquaredTo(rc.getLocation());
                         if (newDis > dis) {
@@ -98,30 +106,45 @@ public class Launcher extends Unit {
             attackTargetHealth = (int) Math.ceil( (double) MAX_HEALTH / (ourTeamStrength));
         } else if (enemyLaunchers.locs[0] != null){
             attackTargetType = RobotType.LAUNCHER;
-            attackTarget = targetPriority(friendlyLaunchers, enemyLaunchers).getKey();
-            attackTargetHealth = targetPriority(friendlyLaunchers, enemyLaunchers).getValue();
+            SimpleLauncherInfo info = targetPriority(friendlyLaunchers, enemyLaunchers);
+            attackTarget = info.loc;
+            attackTargetHealth = info.hitRatio;
+        }
+        if (attackTarget != null) {
+            Direction backDir = rc.getLocation().directionTo(attackTarget).opposite();
+            for (MapLocation friend: friendlyLaunchers.locs) {
+                Direction friendDir = (rc.getLocation().directionTo(friend));
+                if ((friendDir == backDir ||
+                    friendDir == backDir.rotateLeft() ||
+                    friendDir == backDir.rotateRight()) &&
+                    rc.getLocation().distanceSquaredTo(friend) >= 10)
+                    ourTeamStrength -=1;
+            }
         }
         indicator += String.format("Strength%d", ourTeamStrength);
     }
 
-    static void micro() throws GameActionException {
+    static void micro(boolean scdTime) throws GameActionException {
         if (attackTarget != null) {
             if (attackTarget != null && rc.canAttack(attackTarget)) {
                 rc.attack(attackTarget);
             }
             if (rc.isMovementReady()) {
                 // move toward enemy if sensed an enemy outside attack range
-                if (rc.isActionReady() && ourTeamStrength >= 0) {
+                if (rc.isActionReady() && (ourTeamStrength >= 0 ||
+                    (ourTeamStrength==0 && rc.getHealth() > closestEnemy.getHealth()))) {
                     Direction forwardDir = rc.getLocation().directionTo(attackTarget);
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
                     for (Direction dir : dirs) {
                         if (rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS
-                                && rc.canMove(dir)) {
+                                && rc.canMove(dir) && ( rc.senseCloud(rc.getLocation()) ||
+                                !rc.senseCloud(rc.getLocation().add(dir)))) {
                             rc.move(dir);
                             if (rc.canAttack(attackTarget)) {
                                 rc.attack(attackTarget);
                             }
+                            break;
                         }
                     }
                 } else {
@@ -130,27 +153,58 @@ public class Launcher extends Unit {
                         if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health){
                             indicator += String.format("run%d", closestEnemy.health-rc.getHealth());
                             kite(closestEnemy.location, 0);
+                        } else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady()) {
+                            System.out.println("scenario1111111");
+                            kite(closestEnemy.location, 1);
+                        } else if (ourTeamStrength == -1) {
+                            // if I can back off to a location that I can still attack from, kite back
+                            kite(closestEnemy.location, 1);
                         }
-                        else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady())
-                            kite(attackTarget, 1);
-                    } else if (ourTeamStrength == 0 && attackTargetType == RobotType.LAUNCHER) {
-                        // if I can back off to a location that I can still attack from, kite back
-                        kite(attackTarget, 2);
-                    } else if (ourTeamStrength == -1 && attackTargetType == RobotType.LAUNCHER
-                            && attackTargetHealth > 2) {
-                        // if I can back off to a location that I can still attack from, kite back
-                        kite(attackTarget, 1);
+//                        }  else if (ourTeamStrength == 0 && attackTargetType == RobotType.LAUNCHER) {
+//                            System.out.println("scenario22222");
+//                            // if I can back off to a location that I can still attack from, kite back
+//                            kite(attackTarget, 2);
+//                        }
+//
                     }
                 }
             }
+            if (scdTime) {
+                cachedAttackTarget = new SimpleLauncherInfo(attackTarget, attackTargetHealth-1, 0);
+                cachedTurn = 0;
+            }
         } else {
             if (rc.isMovementReady() && cachedDirection != null) {
-                if ( rc.canMove(cachedDirection)) {
+                if (rc.canMove(cachedDirection)) {
                     rc.move(cachedDirection);
-                    indicator += String.format("CacheDir %s", cachedDirection);
+                    System.out.println(String.format("CacheDir %s", cachedDirection));
                 }
                 cachedDirection = null;
             }
+//            if (rc.isMovementReady() && cachedAttackTarget != null) {
+//                Direction dir = rc.getLocation().directionTo(cachedAttackTarget.loc);
+//                if (rc.canMove(dir)) {
+//                    rc.move(dir);
+//                    System.out.println(String.format("CacheDir %s", dir));
+//                }
+//            }
+            if (scdTime
+                && cachedAttackTarget != null
+                && rc.isActionReady()
+                && rc.canAttack(cachedAttackTarget.loc)) {
+                rc.attack(cachedAttackTarget.loc);
+            }
+            MapLocation[] clouds = rc.senseNearbyCloudLocations();
+            if (scdTime && clouds.length != 0) {
+                MapLocation randomCloudLoc = clouds[(int) (Math.random() * clouds.length)];
+                if (rc.isActionReady() && rc.canAttack(randomCloudLoc)) {
+                    rc.attack(randomCloudLoc);
+                }
+            }
+        }
+        if (scdTime) {
+            cachedTurn += 1;
+            if (cachedTurn > 2) cachedAttackTarget = null;
         }
     }
 
@@ -161,10 +215,13 @@ public class Launcher extends Unit {
         Direction result = null;
         for (Direction dir : dirs) {
             if (rc.canMove(dir) && (extraChecks<=1
-             || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS)
-            )) {
+                || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget)
+                    <= Constants.LAUNCHER_ATTACK_DIS))) {
                 if (result == null) result = dir;
-                if (rc.getLocation().add(result).distanceSquaredTo(loc) < rc.getLocation().add(dir).distanceSquaredTo(loc)) {
+                if ((extraChecks<=1 && rc.getLocation().add(result).distanceSquaredTo(loc)
+                        < rc.getLocation().add(dir).distanceSquaredTo(loc)) ||
+                    (extraChecks==2 && rc.getLocation().add(result).distanceSquaredTo(loc)
+                                > rc.getLocation().add(dir).distanceSquaredTo(loc))) {
                     result = dir;
                 }
             }
@@ -184,7 +241,9 @@ public class Launcher extends Unit {
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
         sense();
-        micro();
+        micro(false);
+        indicator += String.format("actCool%d", rc.getActionCooldownTurns());
+        indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
         if (rc.isMovementReady() && attackTarget == null) { // macro
             // If enemy reported recently that is close
             MapLocation enemyLocation = Comm.getEnemyLoc();
@@ -216,11 +275,11 @@ public class Launcher extends Unit {
         }
         if (rc.isActionReady() || rc.isMovementReady()){
             sense();
-            micro();
+            micro(true);
         }
     }
 
-    private static AbstractMap.SimpleEntry<MapLocation,Integer> targetPriority(FastIterableRobotInfoSet friendlyLaunchers, FastIterableRobotInfoSet enemyLaunchers) {
+    private static SimpleLauncherInfo targetPriority(FastIterableRobotInfoSet friendlyLaunchers, FastIterableRobotInfoSet enemyLaunchers) {
         MapLocation targetLoc = null;
         int minHitRatio = 10;
         int maxCanAttackFriends = 1;
@@ -266,19 +325,9 @@ public class Launcher extends Unit {
 //        indicator += String.format("target%s ", target.getID());
 //        rc.setIndicatorLine(rc.getLocation(), target.location, 0, 0 , 0);
 //        assert (!yes || (yes && target.type == RobotType.LAUNCHER)): String.format("targettype%s", target.type);
-        return new AbstractMap.SimpleEntry<>(targetLoc, minHitRatio);
+        return new SimpleLauncherInfo(targetLoc, minHitRatio, maxCanAttackFriends);
     }
 
-    private static RobotInfo getMasterLauncher(RobotInfo r1, RobotInfo r2) {
-        // self may be master
-        if (r2.health < rc.getHealth() || (r2.health == rc.getHealth() && r2.getID() > rc.getID()))
-            return r1;
-        if (r1 == null)
-            return r2;
-        if (r1.health != r2.health)
-            return r1.health < r2.health? r2 : r1;
-        return r1.getID() < r2.getID()? r1 : r2;
-    }
 
 }
 

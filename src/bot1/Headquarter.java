@@ -3,8 +3,6 @@ package bot1;
 import battlecode.common.*;
 import bot1.util.FastIterableLocSet;
 
-import java.util.Map;
-
 public class Headquarter extends Unit {
     private static int carrierCnt = 0;
 

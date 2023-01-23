@@ -1,6 +1,6 @@
 package bot1;
 
-import battlecode.common.*;
+import battlecode.common.Direction;
 
 import java.util.Random;
 

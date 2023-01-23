@@ -1,7 +1,7 @@
 // https://github.com/BSreenivas0713/Battlecode2022/blob/main/src/MPBasic/fast/FastLocIntMap.java
 package bot1.util;
 
-import battlecode.common.*;
+import battlecode.common.MapLocation;
 
 public class FastLocIntMap {
     public StringBuilder keys;

@@ -1,9 +1,6 @@
 package bot1;
 
 import battlecode.common.*;
-import scala.collection.mutable.LinkedEntry;
-
-import java.awt.*;
 
 /***
  *
@@ -43,7 +40,7 @@ public class Comm extends RobotPlayer {
     private static final int WELL_INFO_BIT = 96;
     private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 487;
-    private static final int ISLAND_BIT = 488;
+    private static final int ISLAND_BIT = 511;
 
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
@@ -58,6 +55,7 @@ public class Comm extends RobotPlayer {
 
     public static int NUM_WELLS = 5; // number of wells stored per resource
     public static MapLocation[][] closestWells = new MapLocation[4][NUM_WELLS];
+    public static MapLocation[][] islands = new MapLocation[3][35];
 
     public static final int SPAWN_Q_LENGTH = 16;
 
@@ -247,18 +245,51 @@ public class Comm extends RobotPlayer {
     }
 
     // island storage
-    public static void reportIsland(MapLocation loc, int index) {
-        if (getIslandPos(index) != null)
+    public static int getIslandIndex(MapLocation t) {
+        for (int i = 0; i < 35; i++) {
+            int val = readBits(ISLAND_BIT + i * 14, 14);
+            if (val == 0) continue;
+            MapLocation loc = int2loc((val - val % 4) / 4);
+            if (loc.x == t.x && loc.y == t.y) {
+                return i;
+            }
+        }
+        return -1;
+    }
+    public static int getIslandStatus(MapLocation loc) {
+        int index = getIslandIndex(loc);
+        return readBits(ISLAND_BIT + (index-1) * 14, 14) % 4;
+    }
+
+    public static void reportIsland(MapLocation loc, int index, int status) {
+        //storing island index i at (i-1) since island indexes starts at 1
+        int val = readBits(ISLAND_BIT + (index-1) * 14, 14);
+        if (val != 0 && val % 4 == status) {
             return;
+        }
+        if (val % 4 == 3 && status == 0) {
+            return;
+        }
+        System.out.print("Found Island at ");
+        System.out.println(loc);
+        writeBits(ISLAND_BIT + (index-1) * 14, 14, (loc2int(loc) * 4) + status);
     }
 
-    // return 0 if not found
-    public static int getNextFreeIslandIndex() {
-        return 0;
-    }
-
-    public static MapLocation getIslandPos(int index) {
-        return null;
+    public static MapLocation getClosestIsland() {
+        MapLocation targetLoc = null;
+        int dis = Integer.MAX_VALUE;
+        for (int i = 0; i < 35; i++) {
+            int val = readBits(ISLAND_BIT + i * 14, 14);
+            if (val == 0 || val % 4 != 0) {
+                continue;
+            }
+            MapLocation loc = int2loc((val - val % 4) / 4);
+            if (rc.getLocation().distanceSquaredTo(loc) < dis) {
+                targetLoc = loc;
+                dis = rc.getLocation().distanceSquaredTo(loc);
+            }
+        }
+        return targetLoc;
     }
 
     // symmetry checker

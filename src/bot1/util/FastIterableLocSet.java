@@ -1,6 +1,6 @@
 package bot1.util;
 
-import battlecode.common.*;
+import battlecode.common.MapLocation;
 
 public class FastIterableLocSet {
     public StringBuilder keys;

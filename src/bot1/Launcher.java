@@ -40,6 +40,7 @@ public class Launcher extends Unit {
     static int ourTeamStrength = 1;
     // macro vars
     static RobotInfo furthestFriendlyLauncher = null;
+    static int lastEnemeySensedRound = -100;
 
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
     static FastIterableRobotInfoSet enemyLaunchers = new FastIterableRobotInfoSet();
@@ -57,36 +58,8 @@ public class Launcher extends Unit {
         micro(false);
         indicator += String.format("actCool%d", rc.getActionCooldownTurns());
         indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
-        if (rc.isMovementReady() && attackTarget == null) { // macro
-            // If enemy reported recently that is close
-            MapLocation enemyLocation = Comm.getEnemyLoc();
-            if (enemyLocation != null
-                    && rc.getRoundNum() - Comm.getEnemyRound() <= 50
-                    && Comm.getEnemyRound() > clearedUntilRound
-                    && rc.getLocation().distanceSquaredTo(enemyLocation) <= 64) {
-                if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
-                    // enemy has been cleared
-                    clearedUntilRound = rc.getRoundNum();
-                } else {
-                    moveToward(enemyLocation);
-                    indicator += String.format("M2E@%s", enemyLocation);
-                }
-            } else {
-                // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
-                if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
-                    for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
-                        if (Comm.enemyHQLocations[i % 4] != null) {
-                            enemyHQID = i % 4;
-                            break;
-                        }
-                    }
-                }
-                enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
-                indicator += String.format("M2EHQ@%s", enemyHQLoc);
-                moveToward(enemyHQLoc);
-            }
-        }
-        if (rc.isActionReady() || rc.isMovementReady()){
+        macro();
+        if (rc.isActionReady()){
             sense();
             micro(true);
         }
@@ -128,6 +101,7 @@ public class Launcher extends Unit {
                 } else if (robot.type == RobotType.LAUNCHER) {
                     enemyLaunchers.add(robot);
                     ourTeamStrength -= 1;
+                    lastEnemeySensedRound = rc.getRoundNum();
                 } else {
                     int health = (int) Math.ceil((double) robot.health / DAMAGE);
                     if (attackTargetHealth > health) {
@@ -172,6 +146,42 @@ public class Launcher extends Unit {
             }
         }
         indicator += String.format("Strength%d", ourTeamStrength);
+    }
+
+    static void macro() throws GameActionException{
+        if (!rc.isMovementReady()) {
+            return;
+        }
+        if ((rc.getRoundNum() - lastEnemeySensedRound < 20 && friendlyLaunchers.size < 5) || friendlyLaunchers.size == 0) {
+            return;
+        }
+        // If enemy reported recently that is close
+        MapLocation enemyLocation = Comm.getEnemyLoc();
+        if (enemyLocation != null
+                && rc.getRoundNum() - Comm.getEnemyRound() <= 50
+                && Comm.getEnemyRound() > clearedUntilRound
+                && rc.getLocation().distanceSquaredTo(enemyLocation) <= 64) {
+            if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
+                // enemy has been cleared
+                clearedUntilRound = rc.getRoundNum();
+            } else {
+                moveToward(enemyLocation);
+                indicator += String.format("M2E@%s", enemyLocation);
+            }
+        } else {
+            // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
+            if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
+                for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
+                    if (Comm.enemyHQLocations[i % 4] != null) {
+                        enemyHQID = i % 4;
+                        break;
+                    }
+                }
+            }
+            enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
+            indicator += String.format("M2EHQ@%s", enemyHQLoc);
+            moveToward(enemyHQLoc);
+        }
     }
 
     static void micro(boolean isSecondTime) throws GameActionException {

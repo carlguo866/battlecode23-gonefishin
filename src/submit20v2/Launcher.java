@@ -1,7 +1,7 @@
-package submit20;
+package submit20v2;
 
 import battlecode.common.*;
-import submit20.util.FastIterableRobotInfoSet;
+import submit20v2.util.FastIterableRobotInfoSet;
 
 public class Launcher extends Unit {
     static class SimpleLauncherInfo {
@@ -55,8 +55,8 @@ public class Launcher extends Unit {
         }
         sense();
         micro(false);
-        indicator += String.format("actCool%d", rc.getActionCooldownTurns());
-        indicator += String.format("moveCool%d", rc.getMovementCooldownTurns());
+        indicator += String.format("acd%d", rc.getActionCooldownTurns());
+        indicator += String.format("mcd%d", rc.getMovementCooldownTurns());
         if (rc.isMovementReady() && attackTarget == null) { // macro
             // If enemy reported recently that is close
             MapLocation enemyLocation = Comm.getEnemyLoc();
@@ -69,7 +69,6 @@ public class Launcher extends Unit {
                     clearedUntilRound = rc.getRoundNum();
                 } else {
                     moveToward(enemyLocation);
-                    indicator += String.format("M2E@%s", enemyLocation);
                 }
             } else {
                 // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
@@ -82,7 +81,6 @@ public class Launcher extends Unit {
                     }
                 }
                 enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
-                indicator += String.format("M2EHQ@%s", enemyHQLoc);
                 moveToward(enemyHQLoc);
             }
         }
@@ -171,7 +169,7 @@ public class Launcher extends Unit {
                     ourTeamStrength -=1;
             }
         }
-        indicator += String.format("Strength%d", ourTeamStrength);
+        indicator += String.format("S%d", ourTeamStrength);
     }
 
     static void micro(boolean isSecondTime) throws GameActionException {
@@ -187,9 +185,10 @@ public class Launcher extends Unit {
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
                     for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS
-                                && rc.canMove(dir) && ( rc.senseCloud(rc.getLocation()) ||
-                                !rc.senseCloud(rc.getLocation().add(dir)))) {
+                        if (rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= ATTACK_DIS
+                                && rc.canMove(dir) &&
+                                (rc.senseCloud(rc.getLocation()) || // if in cloud can still move to cloud
+                                !rc.senseCloud(rc.getLocation().add(dir)))) { // if not in cloud dont go into cloud
                             rc.move(dir);
                             if (rc.canAttack(attackTarget)) {
                                 rc.attack(attackTarget);
@@ -202,14 +201,16 @@ public class Launcher extends Unit {
                     if (closestEnemy != null) {
                         if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health){
                             indicator += String.format("run%d", closestEnemy.health-rc.getHealth());
+                            //run
                             kite(closestEnemy.location, 0);
                         } else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady()) {
-//                            System.out.println("scenario1111111");
+                            //cached move outside of vision
                             kite(closestEnemy.location, 1);
                         } else if (ourTeamStrength == -1) {
-                            // if I can back off to a location that I can still attack from, kite back
+                            //cached move outside of vision
                             kite(closestEnemy.location, 1);
                         }
+                            //run and attack; shown unuseful
 //                        }  else if (ourTeamStrength == 0 && attackTargetType == RobotType.LAUNCHER) {
 //                            System.out.println("scenario22222");
 //                            // if I can back off to a location that I can still attack from, kite back
@@ -227,10 +228,10 @@ public class Launcher extends Unit {
             if (rc.isMovementReady() && cachedDirection != null) {
                 if (rc.canMove(cachedDirection)) {
                     rc.move(cachedDirection);
-//                    System.out.println(String.format("CacheDir %s", cachedDirection));
                 }
                 cachedDirection = null;
             }
+            // maybe useful
 //            if (rc.isMovementReady() && cachedAttackTarget != null) {
 //                Direction dir = rc.getLocation().directionTo(cachedAttackTarget.loc);
 //                if (rc.canMove(dir)) {
@@ -259,7 +260,6 @@ public class Launcher extends Unit {
     }
 
     private static void kite(MapLocation loc, int extraChecks) throws GameActionException {
-        // TODO: Carl document what extraChecks means
         Direction backDir = rc.getLocation().directionTo(loc).opposite();
         Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
@@ -268,6 +268,8 @@ public class Launcher extends Unit {
             if (rc.canMove(dir) && (extraChecks<=1
                     || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget)
                     <= Constants.LAUNCHER_ATTACK_DIS))) {
+                // extraCheck == 0: run; extraCheck==1 cache and run out of vision;
+                // extraCheck == 2: go to a loc that can still attack
                 if (result == null) result = dir;
                 if ((extraChecks<=1 && rc.getLocation().add(result).distanceSquaredTo(loc)
                         < rc.getLocation().add(dir).distanceSquaredTo(loc)) ||
@@ -296,14 +298,6 @@ public class Launcher extends Unit {
             if (targetLoc == null) {
                 targetLoc = enemyLoc;
             }
-//            RobotType targetType = enemyLaunchers.getRobotType(targetLoc);
-//            RobotType enemyType = enemyLaunchers.getRobotType(enemyLoc);
-
-//            if (targetType != RobotType.LAUNCHER && enemyType == RobotType.LAUNCHER){
-//                targetLoc = enemyLoc;
-//            } else if (targetType == RobotType.LAUNCHER && enemyType != RobotType.LAUNCHER){
-//                continue;
-//            }
 
             int canAttackFriends = 1;
             for (MapLocation friendLoc: friendlyLaunchers.locs){
@@ -312,25 +306,20 @@ public class Launcher extends Unit {
                     canAttackFriends+=1;
                 }
             }
-//            System.out.println(String.format("loc%s", enemy));
             int hitRatio = (int) Math.ceil((double) enemyHealth / (canAttackFriends));
             if (targetLoc == enemyLoc) {
                 minHitRatio = hitRatio;
             } else {
                 if (minHitRatio > hitRatio){
                     targetLoc = enemyLoc;
-//                    maxCanAttackFriends = canAttackFriends;
+                    maxCanAttackFriends = canAttackFriends;
                 } else if (minHitRatio == hitRatio){
                     targetLoc = rc.getLocation().distanceSquaredTo(targetLoc) <
                             rc.getLocation().distanceSquaredTo(enemyLoc)? targetLoc : enemyLoc;
-//                    maxCanAttackFriends = canAttackFriends;
+                    maxCanAttackFriends = canAttackFriends;
                 }
             }
         }
-//        indicator += String.format("pos%s", rc.getLocation());
-//        indicator += String.format("target%s ", target.getID());
-//        rc.setIndicatorLine(rc.getLocation(), target.location, 0, 0 , 0);
-//        assert (!yes || (yes && target.type == RobotType.LAUNCHER)): String.format("targettype%s", target.type);
         return new SimpleLauncherInfo(targetLoc, minHitRatio, maxCanAttackFriends);
     }
 

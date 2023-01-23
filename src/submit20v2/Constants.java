@@ -1,4 +1,4 @@
-package submit20;
+package submit20v2;
 
 import battlecode.common.Direction;
 

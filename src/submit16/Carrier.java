@@ -1,8 +1,8 @@
-package launcher;
+package submit16;
 
 import battlecode.common.*;
-import launcher.util.FastIterableLocSet;
-import launcher.util.FastLocIntMap;
+import submit16.util.FastIterableLocSet;
+import submit16.util.FastLocIntMap;
 
 import java.util.Random;
 
@@ -46,9 +46,6 @@ public class Carrier extends Unit {
     static double scoutAngle = 0;
     static FastIterableLocSet[] wellsSeen = {null, null, null};
     static FastIterableLocSet[] wellsToReport = {null, null, null};
-    static FastIterableLocSet[] islandsSeen = {null, null, null};
-    static FastIterableLocSet[] islandsToReport = {null, null, null};
-    static int[][] islandIdToReport = new int[3][100];
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
@@ -56,14 +53,6 @@ public class Carrier extends Unit {
             wellsSeen[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(145);
             wellsToReport[ResourceType.MANA.resourceID] = new FastIterableLocSet(10);
             wellsToReport[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(10);
-
-            //0: unoccupied island; 1: us-occupied island; 2: enemy-occupied island
-            islandsSeen[0] = new FastIterableLocSet(35);
-            islandsToReport[0] = new FastIterableLocSet(35);
-            islandsSeen[1] = new FastIterableLocSet(26);
-            islandsToReport[1] = new FastIterableLocSet(26);
-            islandsSeen[2] = new FastIterableLocSet(26);
-            islandsToReport[2] = new FastIterableLocSet(26);
 
             startHQID = getClosestID(Comm.friendlyHQLocations);
             startHQLoc = Comm.friendlyHQLocations[startHQID];
@@ -203,29 +192,33 @@ public class Carrier extends Unit {
             }
         }
     }
-    private static MapLocation anchortarget;
+
     private static void anchor() throws GameActionException {
         indicator += "anchoring";
+        int[] islands = rc.senseNearbyIslands();
         if (rc.canPlaceAnchor()) {
             rc.placeAnchor();
             tryFindMine();
-            anchortarget = null;
             return;
         }
-        if (anchortarget != null) {
-            int status = Comm.getIslandStatus(anchortarget);
-            if (status == 3) {
-                moveToward(anchortarget);
-                return ;
+        MapLocation targetLoc = null;
+        int dis = Integer.MAX_VALUE;
+        for (int island : islands) {
+            if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
+                // we can't place here
+                continue;
+            }
+            MapLocation locs[] = rc.senseNearbyIslandLocations(island);
+            for (MapLocation loc : locs) {
+                if (rc.getLocation().distanceSquaredTo(loc) < dis) {
+                    targetLoc = loc;
+                    dis = rc.getLocation().distanceSquaredTo(loc);
+                }
             }
         }
-        MapLocation targetLoc = Comm.getClosestIsland();
         if (targetLoc == null) {
-            System.out.println("Available Island Not Found");
             randomMove();
         } else {
-            anchortarget = targetLoc;
-            Comm.reportIsland(targetLoc, Comm.getIslandIndex(targetLoc), 3);
             indicator += targetLoc;
             moveToward(targetLoc);
         }
@@ -241,35 +234,6 @@ public class Carrier extends Unit {
                 // TODO need to check if need to report, o.w. report set may index out of bound
                 wellsSeen[well.getResourceType().resourceID].add(well.getMapLocation());
                 wellsToReport[well.getResourceType().resourceID].add(well.getMapLocation());
-            }
-        }
-
-        int rem = Clock.getBytecodesLeft();
-        for (int i : rc.senseNearbyIslands()) {
-            if (Clock.getBytecodesLeft() <= rem - 3000) {
-                return;
-            }
-            Team now = rc.senseTeamOccupyingIsland(i);
-            MapLocation islandloc = rc.senseNearbyIslandLocations(i)[0];
-            int idx = 0;
-            if (now == Team.NEUTRAL) {
-                idx = 0;
-            }
-            else if (now == rc.getTeam()) {
-                idx = 1;
-            }
-            else {
-                idx = 2;
-            }
-            for (int j = 0; j < 3; j++) {
-                if (j != idx && islandsSeen[j].contains(islandloc)) {
-                    islandsSeen[j].remove(islandloc);
-                }
-            }
-            if (!islandsSeen[idx].contains(islandloc)) {
-                islandsSeen[idx].add(islandloc);
-                islandsToReport[idx].add(islandloc);
-                islandIdToReport[idx][islandsToReport[idx].size - 1] = i;
             }
         }
     }
@@ -326,7 +290,6 @@ public class Carrier extends Unit {
         return lastEnemyRound > (Comm.getEnemyRound() + 2)
                 || wellsToReport[ResourceType.ADAMANTIUM.resourceID].size > 0
                 || wellsToReport[ResourceType.MANA.resourceID].size > 0
-                || islandsToReport[0].size > 0
                 || Comm.needSymmetryReport;
     }
 
@@ -344,16 +307,6 @@ public class Carrier extends Unit {
                 wellsToReport[resource].clear();
             }
         }
-        for (int status = 0; status < 3; status++) {
-            if (islandsToReport[status].size > 0) {
-                islandsToReport[status].updateIterable();
-                for (int i = islandsToReport[status].size; --i >= 0;) {
-                    Comm.reportIsland(islandsToReport[status].locs[i], islandIdToReport[status][i], status);
-                }
-                islandsToReport[status].clear();
-            }
-        }
-        
         Comm.reportSym();
         Comm.commit_write();
     }

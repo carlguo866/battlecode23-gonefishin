@@ -27,7 +27,7 @@ public class Launcher extends Unit {
     // macro vars
     static RobotInfo masterLauncher = null;
     static int dis = 0;
-//    static int friendlyLauncherCnt = 1;
+    //    static int friendlyLauncherCnt = 1;
     static RobotInfo furthestFriendlyLauncher = null;
 
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
@@ -54,7 +54,9 @@ public class Launcher extends Unit {
 //                    friendlyLauncherCnt += 1;
                     if (friendlyLaunchers.size < 8)
                         friendlyLaunchers.add(robot);
-                    ourTeamStrength += 1;
+                    if (robot.location.distanceSquaredTo(rc.getLocation()) <= 10){
+                        ourTeamStrength += 1;
+                    }
                     if (furthestFriendlyLauncher == null) {
                         int newDis = robot.getLocation().distanceSquaredTo(rc.getLocation());
                         if (newDis > dis) {
@@ -111,7 +113,8 @@ public class Launcher extends Unit {
             }
             if (rc.isMovementReady()) {
                 // move toward enemy if sensed an enemy outside attack range
-                if (rc.isActionReady() && ourTeamStrength >= 0) {
+                if (rc.isActionReady() && (ourTeamStrength >= 0 ||
+                (ourTeamStrength==0 && rc.getHealth() > closestEnemy.getHealth()))) {
                     Direction forwardDir = rc.getLocation().directionTo(attackTarget);
                     Direction[] dirs = {forwardDir, forwardDir.rotateLeft(), forwardDir.rotateRight(),
                             forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
@@ -130,24 +133,32 @@ public class Launcher extends Unit {
                         if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health){
                             indicator += String.format("run%d", closestEnemy.health-rc.getHealth());
                             kite(closestEnemy.location, 0);
+                        } else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady()){
+                            System.out.println("scenario1111111");
+                            kite(closestEnemy.location, 1);
+                        } else if (ourTeamStrength == -1 && attackTargetHealth > 2) {
+                            System.out.println("scenario33333");
+                            // if I can back off to a location that I can still attack from, kite back
+                            kite(closestEnemy.location, 1);
                         }
-                        else if (rc.getHealth() == closestEnemy.health && !rc.isActionReady())
-                            kite(attackTarget, 1);
-                    } else if (ourTeamStrength == 0 && attackTargetType == RobotType.LAUNCHER) {
-                        // if I can back off to a location that I can still attack from, kite back
-                        kite(attackTarget, 2);
-                    } else if (ourTeamStrength == -1 && attackTargetType == RobotType.LAUNCHER
-                            && attackTargetHealth > 2) {
-                        // if I can back off to a location that I can still attack from, kite back
-                        kite(attackTarget, 1);
                     }
+//                    if (ourTeamStrength == 0 && attackTargetType == RobotType.LAUNCHER) {
+//                        System.out.println("scenario22222");
+//                        // if I can back off to a location that I can still attack from, kite back
+//                        kite(attackTarget, 2);
+//                    } else if (ourTeamStrength == -1 && attackTargetType == RobotType.LAUNCHER
+//                            && attackTargetHealth > 2) {
+//                        System.out.println("scenario33333");
+//                        // if I can back off to a location that I can still attack from, kite back
+//                        kite(attackTarget, 1);
+//                    }
                 }
             }
         } else {
             if (rc.isMovementReady() && cachedDirection != null) {
                 if ( rc.canMove(cachedDirection)) {
                     rc.move(cachedDirection);
-                    indicator += String.format("CacheDir %s", cachedDirection);
+                    System.out.println(String.format("CacheDir %s", cachedDirection));
                 }
                 cachedDirection = null;
             }
@@ -161,10 +172,13 @@ public class Launcher extends Unit {
         Direction result = null;
         for (Direction dir : dirs) {
             if (rc.canMove(dir) && (extraChecks<=1
-             || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget) <= Constants.LAUNCHER_ATTACK_DIS)
-            )) {
+                || (extraChecks == 2 && rc.getLocation().add(dir).distanceSquaredTo(attackTarget)
+                    <= Constants.LAUNCHER_ATTACK_DIS))) {
                 if (result == null) result = dir;
-                if (rc.getLocation().add(result).distanceSquaredTo(loc) < rc.getLocation().add(dir).distanceSquaredTo(loc)) {
+                if ((extraChecks<=1 && rc.getLocation().add(result).distanceSquaredTo(loc)
+                        < rc.getLocation().add(dir).distanceSquaredTo(loc)) ||
+                    (extraChecks==2 && rc.getLocation().add(result).distanceSquaredTo(loc)
+                                > rc.getLocation().add(dir).distanceSquaredTo(loc))) {
                     result = dir;
                 }
             }

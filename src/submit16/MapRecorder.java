@@ -1,7 +1,7 @@
-package launcher;
+package submit16;
 
 import battlecode.common.*;
-import launcher.util.FastIterableLocSet;
+import submit16.util.FastIterableLocSet;
 
 public class MapRecorder extends RobotPlayer {
     // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting
@@ -11,7 +11,6 @@ public class MapRecorder extends RobotPlayer {
     public static final int WELL_BIT = 1 << 6;
     public static final int PASSIABLE_BIT = 1 << 7;
     public static final int ISLAND_BIT = 1 << 8;
-    public static final int ACCESSIBLE_BIT = 1 << 9;
     public static final int RECORDED_BIT = 1 << 10;
     public static final int CURRENT_MASK = 0xF;
     public static final int SYM_MASK = 0xF0; // all bits used in symmetry checking except current
@@ -28,7 +27,7 @@ public class MapRecorder extends RobotPlayer {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
                 return;
             }
-            if ((vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] & SEEN_BIT) != 0)
+            if (vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] != 0)
                 continue;
             MapInfo info = infos[i];
             int x = info.getMapLocation().x;
@@ -116,61 +115,4 @@ public class MapRecorder extends RobotPlayer {
         return set;
     }
 
-    // use scripts/pos_gen.py
-    private static final int HQ_SPAWNABLE_DELTA[][] = {{-3, 0}, {0, -3}, {0, 3}, {3, 0}, {-2, -2}, {-2, 2}, {2, -2}, {2, 2}, {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}, {-2, 0}, {0, -2}, {0, 2}, {2, 0}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}, {-1, 0}, {0, -1}, {0, 1}, {1, 0}};
-    // this func called at the start of each HQ to get us out of jail
-    // should take 6k bytecode on regular maps, about 8k if too much currents around HQ
-    public static void hqInit() throws GameActionException {
-        MapInfo[] infos = rc.senseNearbyMapInfos();
-        for (int i = infos.length; --i >= 0; ) {
-            if (infos[i].isPassable()) {
-                vals[infos[i].getMapLocation().x][infos[i].getMapLocation().y] = PASSIABLE_BIT | infos[i].getCurrentDirection().ordinal();
-                Headquarter.sensablePassibleArea++;
-            }
-        }
-        Headquarter.spawnableSet = new FastIterableLocSet(29);
-        int hqX = rc.getLocation().x;
-        int hqY = rc.getLocation().y;
-        vals[hqX][hqY] |= ACCESSIBLE_BIT;
-        // this is not a BFS and will miss maze-like tiles but it's fast and good enough
-        for (int i = HQ_SPAWNABLE_DELTA.length; --i >= 0;) {
-            int x = hqX + HQ_SPAWNABLE_DELTA[i][0];
-            int y = hqY + HQ_SPAWNABLE_DELTA[i][1];
-            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x][y] & PASSIABLE_BIT) == 0)
-                continue;
-            do {
-                if (x + 1 < mapWidth && (vals[x + 1][y] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (x + 1 < mapWidth && y - 1 >= 0 && (vals[x + 1][y - 1] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (x + 1 < mapWidth && y + 1 < mapHeight && (vals[x + 1][y + 1] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (x - 1 >= 0 && (vals[x - 1][y] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (x - 1 >= 0 && y - 1 >= 0 && (vals[x - 1][y - 1] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (x - 1 >= 0 && y + 1 < mapHeight && (vals[x - 1][y + 1] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (y - 1 >= 0 && (vals[x][y - 1] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-                if (y + 1 < mapHeight && (vals[x][y + 1] & ACCESSIBLE_BIT) != 0)
-                {vals[x][y] |= ACCESSIBLE_BIT; break;}
-            } while (false);
-            if ((vals[x][y] & ACCESSIBLE_BIT) != 0 && (vals[x][y] & CURRENT_MASK) == 8) {
-                Headquarter.spawnableSet.add(x, y);
-            }
-        }
-        if (Headquarter.spawnableSet.size < 5) {
-            System.out.println("HQ spawnable area too small, allow spawning on currents and unaccessible areas");
-            Headquarter.spawnableSet.updateIterable(); // this makes sure the previous locations have priority
-            for (int i = HQ_SPAWNABLE_DELTA.length; --i >= 0;) {
-                int x = hqX + HQ_SPAWNABLE_DELTA[i][0];
-                int y = hqY + HQ_SPAWNABLE_DELTA[i][1];
-                if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x][y] & PASSIABLE_BIT) == 0 || (x - hqX) * (x - hqX) + (y - hqY) * (y - hqY) > 9)
-                    continue;
-                Headquarter.spawnableSet.add(x, y);
-            }
-        }
-        Headquarter.spawnableSet.updateIterable();
-    }
 }

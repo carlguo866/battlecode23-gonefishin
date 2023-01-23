@@ -94,12 +94,11 @@ public class Unit extends RobotPlayer {
         if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 1) {
             pathingCnt = 0;
         }
-        indicator += String.format("cnt%d,", pathingCnt);
-        lastPathingTarget = location;
-        lastPathingTurn = turnCount;
+        indicator += String.format("2%sc%ds%d,", location, pathingCnt, stuckCnt);
 
         if (rc.isMovementReady()) {
-            if (rc.getLocation().equals(lastLocation)) {
+            // we increase stuck count only if it's a new turn (optim for empty carriers)
+            if (rc.getLocation().equals(lastLocation) && turnCount != lastPathingTurn) {
                 stuckCnt += 1;
             } else {
                 stuckCnt = 0;
@@ -110,8 +109,20 @@ public class Unit extends RobotPlayer {
                 randomMove();
                 pathingCnt = 0;
             }
-            if (stuckCnt >= 8) {
-                rc.disintegrate();
+            if (stuckCnt >= 10) {
+                // make sure if it's a carrier on a well, wait 40 turns
+                do {
+                    if (rc.getType() == RobotType.CARRIER && rc.getWeight() == GameConstants.CARRIER_CAPACITY) {
+                        if (rc.senseWell(rc.getLocation()) != null || stuckCnt < 20) {
+                            break; // a carrier on a well should never disintegrate, a carrier with max resource gets extra time
+                        }
+                        if (rc.getNumAnchors(Anchor.STANDARD) == 1 && stuckCnt < 40) {
+                            break; // a carrier trying having an anchor gets extra time
+                        }
+                    }
+                    System.out.printf("loc %s disintegrate due to stuck\n", rc.getLocation());
+                    rc.disintegrate();
+                } while (false);
             }
 
             if (pathingCnt == 0) {
@@ -174,6 +185,9 @@ public class Unit extends RobotPlayer {
                 }
             }
         }
+
+        lastPathingTarget = location;
+        lastPathingTurn = turnCount;
     }
 
     static boolean canPass(Direction dir) throws GameActionException {

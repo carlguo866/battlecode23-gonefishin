@@ -251,17 +251,18 @@ public class Comm extends RobotPlayer {
             if (val == 0) continue;
             MapLocation loc = int2loc((val - val % 4) / 4);
             if (loc.x == t.x && loc.y == t.y) {
-                return i;
+                return (i+1);
             }
         }
-        return -1;
+        System.out.println("ISLAND NOT FOUND IN COMM");
+        return 36;
     }
     public static int getIslandStatus(MapLocation loc) {
         int index = getIslandIndex(loc);
         return readBits(ISLAND_BIT + (index-1) * 14, 14) % 4;
     }
 
-    public static void reportIsland(MapLocation loc, int index, int status) {
+    public static void reportIsland(MapLocation loc, int index, int status) throws GameActionException{
         //storing island index i at (i-1) since island indexes starts at 1
         int val = readBits(ISLAND_BIT + (index-1) * 14, 14);
         if (val != 0 && val % 4 == status) {
@@ -270,9 +271,8 @@ public class Comm extends RobotPlayer {
         if (val % 4 == 3 && status == 0) {
             return;
         }
-        System.out.print("Found Island at ");
-        System.out.println(loc);
         writeBits(ISLAND_BIT + (index-1) * 14, 14, (loc2int(loc) * 4) + status);
+        commit_write();
     }
 
     public static MapLocation getClosestIsland() {

@@ -206,13 +206,17 @@ public class Carrier extends Unit {
     private static MapLocation anchortarget;
     private static void anchor() throws GameActionException {
         indicator += "anchoring";
-        if (rc.canPlaceAnchor()) {
-            rc.placeAnchor();
-            tryFindMine();
-            anchortarget = null;
-            return;
-        }
         if (anchortarget != null) {
+            if ((anchortarget.x == rc.getLocation().x) && (anchortarget.y == rc.getLocation().y)) {
+                //System.out.println(anchortarget);
+                if (rc.canPlaceAnchor()) {                    
+                    rc.placeAnchor();
+                    tryFindMine();
+                    anchortarget = null;
+                    //Comm.reportIsland(anchortarget, Comm.getIslandIndex(anchortarget), 1);
+                }
+                return;
+            }
             int status = Comm.getIslandStatus(anchortarget);
             if (status == 3) {
                 moveToward(anchortarget);
@@ -221,10 +225,11 @@ public class Carrier extends Unit {
         }
         MapLocation targetLoc = Comm.getClosestIsland();
         if (targetLoc == null) {
-            System.out.println("Available Island Not Found");
             randomMove();
         } else {
             anchortarget = targetLoc;
+            System.out.print("Putting anchor at ");
+            System.out.println(anchortarget);
             Comm.reportIsland(targetLoc, Comm.getIslandIndex(targetLoc), 3);
             indicator += targetLoc;
             moveToward(targetLoc);

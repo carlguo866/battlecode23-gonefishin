@@ -72,7 +72,7 @@ public class Launcher extends Unit {
                 }
             } else {
                 // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
-                if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 4) {
+                if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
                     for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
                         if (Comm.enemyHQLocations[i % 4] != null) {
                             enemyHQID = i % 4;

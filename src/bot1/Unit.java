@@ -200,6 +200,12 @@ public class Unit extends RobotPlayer {
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null)
             return false;
+        // disallow going into enemy HQ attack range when symmetry confirmed
+        if (Comm.isSymmetryConfirmed
+                && getClosestDis(Comm.enemyHQLocations) > 9
+                && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
+            return false;
+        }
         Direction current = info.getCurrentDirection();
         // only allow currents blowing in the direction of the target direction
         if (current == Direction.CENTER || current == targetDir

@@ -188,7 +188,7 @@ public class Carrier extends Unit {
                 lastEnemyOnMine.remove(miningWellLoc);
                 lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
             }
-            state = REPORT_AND_RUNAWAY;
+            state = RUNAWAY;
         }
     }
 

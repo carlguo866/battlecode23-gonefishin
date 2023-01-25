@@ -1,4 +1,4 @@
-package submit21_sprint2;
+package submit21_sprint2v2;
 
 import battlecode.common.*;
 

@@ -5,7 +5,7 @@ import battlecode.common.Direction;
 import java.util.Random;
 
 public class Constants {
-    public static final int LAUNCHER_COST_MN = 60;
+    public static final int LAUNCHER_COST_MN = 45;
     public static final int LAUNCHER_ATTACK_DIS = 16;
 
     public static final int CARRIER_COST_AD = 50;

@@ -1,4 +1,4 @@
-package submit21_sprint2.util;
+package submit21_sprint2v2.util;
 
 import battlecode.common.MapLocation;
 import battlecode.common.RobotInfo;

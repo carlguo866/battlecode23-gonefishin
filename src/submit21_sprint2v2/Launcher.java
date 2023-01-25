@@ -1,7 +1,7 @@
-package submit21_sprint2;
+package submit21_sprint2v2;
 
 import battlecode.common.*;
-import submit21_sprint2.util.FastIterableRobotInfoSet;
+import submit21_sprint2v2.util.FastIterableRobotInfoSet;
 
 public class Launcher extends Unit {
     static class SimpleLauncherInfo {
@@ -34,7 +34,7 @@ public class Launcher extends Unit {
     }
 
     private static final int MAX_HEALTH = 200;
-    private static final int DAMAGE = 30;
+    private static final int DAMAGE = 20;
     private static final int ATTACK_DIS = 16;
 
     private static final int VISION_DIS = 20;

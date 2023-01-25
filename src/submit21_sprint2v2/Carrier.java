@@ -1,8 +1,8 @@
-package submit21_sprint2;
+package submit21_sprint2v2;
 
 import battlecode.common.*;
-import submit21_sprint2.util.FastIterableLocSet;
-import submit21_sprint2.util.FastLocIntMap;
+import submit21_sprint2v2.util.FastIterableLocSet;
+import submit21_sprint2v2.util.FastLocIntMap;
 
 import java.util.Random;
 
@@ -441,10 +441,6 @@ public class Carrier extends Unit {
     private static void collect() throws GameActionException {
         int hqid = getClosestID(Comm.friendlyHQLocations);
         miningHQLoc = Comm.friendlyHQLocations[hqid];
-        // may be able to collect twice per turn
-        if (rc.canCollectResource(miningWellLoc, -1)) {
-            rc.collectResource(miningWellLoc, -1);
-        }
         if (rc.canCollectResource(miningWellLoc, -1)) {
             rc.collectResource(miningWellLoc, -1);
         }

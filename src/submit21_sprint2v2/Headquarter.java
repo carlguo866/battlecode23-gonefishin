@@ -1,7 +1,7 @@
-package submit21_sprint2;
+package submit21_sprint2v2;
 
 import battlecode.common.*;
-import submit21_sprint2.util.FastIterableLocSet;
+import submit21_sprint2v2.util.FastIterableLocSet;
 
 public class Headquarter extends Unit {
     private static int carrierCnt = 0;

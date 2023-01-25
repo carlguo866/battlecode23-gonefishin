@@ -441,10 +441,6 @@ public class Carrier extends Unit {
     private static void collect() throws GameActionException {
         int hqid = getClosestID(Comm.friendlyHQLocations);
         miningHQLoc = Comm.friendlyHQLocations[hqid];
-        // may be able to collect twice per turn
-        if (rc.canCollectResource(miningWellLoc, -1)) {
-            rc.collectResource(miningWellLoc, -1);
-        }
         if (rc.canCollectResource(miningWellLoc, -1)) {
             rc.collectResource(miningWellLoc, -1);
         }

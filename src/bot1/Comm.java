@@ -1,6 +1,7 @@
 package bot1;
 
 import battlecode.common.*;
+import bot1.util.FastIterableIntSet;
 
 /***
  *
@@ -48,8 +49,7 @@ public class Comm extends RobotPlayer {
     public static final int ISLAND_ON_THE_WAY = 3; // carrier is on the way
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
-    private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
-    private static boolean is_array_changed_total = false;
+    private static FastIterableIntSet changedIndexes = new FastIterableIntSet(ARRAY_LENGTH);
 
     private static boolean needWellsUpdate = false;
 
@@ -95,14 +95,13 @@ public class Comm extends RobotPlayer {
 
     // IMPORTANT: always ensure that any write op is performed when writable
     public static void commit_write() throws GameActionException {
-        if (is_array_changed_total) {
-            for (int i = 0; i < ARRAY_LENGTH; i++) {
-                if (is_array_changed[i]) {
-                    rc.writeSharedArray(i, buffered_share_array[i]);
-                    is_array_changed[i] = false;
-                }
+        if (changedIndexes.size > 0) {
+            changedIndexes.updateIterable();
+            int[] indexes = changedIndexes.ints;
+            for (int i = changedIndexes.size; --i>=0;) {
+                rc.writeSharedArray(indexes[i], buffered_share_array[indexes[i]]);
             }
-            is_array_changed_total = false;
+            changedIndexes.clear();
         }
     }
 
@@ -376,41 +375,29 @@ public class Comm extends RobotPlayer {
     }
 
     // helper funcs
-    private static int read_Segment_of_bits(int left, int right, int rv){
-        int X = buffered_share_array[left/16];
-        int x = 16 - left%16, y = 15 - right%16;
-        int length = right - left + 1;
-        return (rv << length) + ((X%(1<<x))>>y);
-    }
-
-    private static int readBits(int startingBitIndex, int length) {
-        int endingBitIndex = startingBitIndex + length - 1;
+    private static int readBits(int left, int length) {
+        int endingBitIndex = left + length - 1;
         int rv = 0;
-        int current = startingBitIndex;
-        while (current <= endingBitIndex){
-            int left = current;
-            int right = Math.min(left/16*16+15, endingBitIndex);
-            rv = read_Segment_of_bits (left, right, rv);
-            current = right + 1;
+        while (left <= endingBitIndex) {
+            int right = Math.min(left | 0xF, endingBitIndex);
+            rv = (rv << (right - left + 1)) + ((buffered_share_array[left/16] % (1 << (16 - left%16))) >> (15 - right % 16));
+            left = right + 1;
         }
         return rv;
     }
 
     private static void writeBits(int startingBitIndex, int length, int value) {
         assert value < (1 << length);
-        int current_ending = startingBitIndex + length - 1;
         int current_length = length;
-        int current_value = value;
         while (current_length > 0){
-            current_ending = startingBitIndex + current_length - 1;
+            int current_ending = startingBitIndex + current_length - 1;
             int len = Math.min(current_ending%16+1, current_length);
             int left = current_ending - len + 1;
-            int original_value = read_Segment_of_bits (left, current_ending, 0);
-            int new_value = current_value % (1 << len);
-            current_value >>= len;
+            int original_value = (buffered_share_array[left/16] % (1 << (16 - left%16))) >> (15 - current_ending % 16);
+            int new_value = value % (1 << len);
+            value >>= len;
             if (new_value != original_value){
-                is_array_changed[current_ending / 16] = true;
-                is_array_changed_total = true;
+                changedIndexes.add(current_ending / 16);
                 buffered_share_array[current_ending / 16] ^= (new_value^original_value) << (15 - current_ending % 16);
             }
             current_length -= len;

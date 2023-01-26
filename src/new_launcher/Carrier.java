@@ -1,8 +1,8 @@
-package launcher;
+package new_launcher;
 
 import battlecode.common.*;
-import launcher.util.FastIterableLocSet;
-import launcher.util.FastLocIntMap;
+import new_launcher.util.FastIterableLocSet;
+import new_launcher.util.FastLocIntMap;
 
 import java.util.Random;
 
@@ -10,7 +10,6 @@ public class Carrier extends Unit {
     // purposes
     public static final int MINE_MN = 1; // mining is default
     public static final int MINE_AD = 2;
-    public static final int SCOUT_SYMMETRY = 3;
 
     public static final int MINING = 10;
     public static final int DROPPING_RESOURCE = 11;
@@ -22,6 +21,9 @@ public class Carrier extends Unit {
     public static final int REPORTING_INFO = 31;
 
     public static final int ANCHORING = 40;
+
+    public static int lastCarrierReportRound = -1000;
+    public static int carrierID = 0;
 
     public static int purpose = 0;
     public static int state = 0;
@@ -58,28 +60,28 @@ public class Carrier extends Unit {
             wellsToReport[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(10);
 
             //0: unoccupied island; 1: us-occupied island; 2: enemy-occupied island
-            islandsSeen[0] = new FastIterableLocSet(35);
-            islandsToReport[0] = new FastIterableLocSet(35);
-            islandsSeen[1] = new FastIterableLocSet(26);
-            islandsToReport[1] = new FastIterableLocSet(26);
-            islandsSeen[2] = new FastIterableLocSet(26);
-            islandsToReport[2] = new FastIterableLocSet(26);
+            islandsSeen[Comm.ISLAND_NEUTRAL] = new FastIterableLocSet(35);
+            islandsToReport[Comm.ISLAND_NEUTRAL] = new FastIterableLocSet(35);
+            islandsSeen[Comm.ISLAND_FRIENDLY] = new FastIterableLocSet(35);
+            islandsToReport[Comm.ISLAND_FRIENDLY] = new FastIterableLocSet(35);
+            islandsSeen[Comm.ISLAND_ENEMY] = new FastIterableLocSet(35);
+            islandsToReport[Comm.ISLAND_ENEMY] = new FastIterableLocSet(35);
+
+            if (rc.canWriteSharedArray(0, 0)) {
+                report(); // to get the carrier ID
+            }
 
             startHQID = getClosestID(Comm.friendlyHQLocations);
             startHQLoc = Comm.friendlyHQLocations[startHQID];
             scoutCenter = startHQLoc;
 
             rng = new Random(rc.getID());
-            purpose = Comm.getSpawnFlag();
-            if (purpose == 0) {
-                purpose = MINE_MN;
-                System.out.println("Carrier spawn Q no flag");
-            }
+            purpose = rc.getID() % 4 == 0? MINE_AD : MINE_MN;
             updateWells();
-            resumeWork();
+            tryFindMine();
         }
 
-        indicator += String.format("P%dS%d,", purpose, state);
+        indicator += String.format("S%dR%s,", state, miningResourceType);
         checkAnchor();
         if (state == ANCHORING) {
             anchor();
@@ -87,11 +89,6 @@ public class Carrier extends Unit {
         }
 
         if (state == SCOUTING) {
-            if (purpose == SCOUT_SYMMETRY) {
-                MapRecorder.recordSym(4000);
-            } else {
-                MapRecorder.recordFast(4000);
-            }
             scoutSense();
         }
         senseEnemy();
@@ -122,73 +119,53 @@ public class Carrier extends Unit {
 
         // just try sense and report no matter what the role is
         scoutSense();
-        if (isNeedReport() && rc.canWriteSharedArray(0, 0)) {
+        if (needReport() && rc.canWriteSharedArray(0, 0)) {
             report();
         }
-        if (purpose != SCOUT_SYMMETRY) {
-            MapRecorder.recordFast(500);
-        }
+        MapRecorder.recordSym(500);
     }
 
     // sense and attack nearby enemies
     private static void senseEnemy() throws GameActionException {
         closestEnemy = null;
         int dis = Integer.MAX_VALUE;
+        int strength = 0;
         for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
             if (robot.type == RobotType.LAUNCHER) {
                 int newDis = robot.location.distanceSquaredTo(rc.getLocation());
                 if (closestEnemy == null || newDis < dis) {
                     dis = newDis;
                     closestEnemy = robot;
+                    strength -= robot.health;
                 }
             }
         }
         if (closestEnemy != null) {
+            for (RobotInfo robot : rc.senseNearbyRobots(closestEnemy.location, 16, myTeam)) {
+                if (robot.type == RobotType.LAUNCHER) {
+                    strength += robot.health;
+                }
+            }
+            if (strength > 0) {
+                return;
+            }
             lastEnemyLoc = closestEnemy.location;
             lastEnemyRound = rc.getRoundNum();
+            if (state == MINING || state == DROPPING_RESOURCE) {
+                lastEnemyOnMine.remove(miningWellLoc);
+                lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
+            }
+            // try preserve the resource, unless too close, TODO if against a wall maybe just attack
+            state = RUNAWAY;
             if (rc.canAttack(closestEnemy.location)) {
                 indicator += "attack,";
                 rc.attack(closestEnemy.location);
-            } else { // no resource or too far away
-                if (rc.getWeight() >= 20) { // ow not worth it to get close to attack
-                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location);
-                    Direction[] dirs = {forwardDir.rotateRight().rotateRight(), forwardDir.rotateLeft().rotateLeft(),
-                            forwardDir.rotateLeft(), forwardDir.rotateRight(), forwardDir};
-                    for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.CARRIER_ATTACK_DIS
-                                && rc.canMove(dir)) {
-                            rc.move(dir);
-                            assert rc.canAttack(closestEnemy.location);
-                            indicator += "goattack,";
-                            if (rc.canAttack(closestEnemy.location)) {
-                                rc.attack(closestEnemy.location);
-                            }
-                        }
-                    }
-                }
-                // If I can move and still have stuff, throw it all away, just don't hit a teammate
-                if (rc.isMovementReady() && rc.getWeight() > 0) {
-                    for (int i = 1; i <= 20; i++) {
-                        MapLocation loc = new MapLocation(rc.getLocation().x + BFS25[i][0],
-                                rc.getLocation().y + BFS25[i][1]);
-                        if (rc.onTheMap(loc) && rc.canSenseLocation(loc)) {
-                            RobotInfo robot = rc.senseRobotAtLocation(loc);
-                            if (robot == null || robot.team != myTeam || robot.type == RobotType.HEADQUARTERS) {
-                                if (rc.canAttack(loc)) {
-                                    rc.attack(loc);
-                                    indicator += String.format("throw %s,", loc);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
             }
             if (state == MINING || state == DROPPING_RESOURCE) {
                 lastEnemyOnMine.remove(miningWellLoc);
                 lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
             }
-            state = REPORT_AND_RUNAWAY;
+            state = RUNAWAY;
         }
     }
 
@@ -203,30 +180,60 @@ public class Carrier extends Unit {
             }
         }
     }
-    private static MapLocation anchortarget;
+
+    private static MapLocation targetLoc;
+    private static int targetIslandIndex = -1;
     private static void anchor() throws GameActionException {
-        indicator += "anchoring";
-        if (rc.canPlaceAnchor()) {
-            rc.placeAnchor();
-            tryFindMine();
-            anchortarget = null;
-            return;
-        }
-        if (anchortarget != null) {
-            int status = Comm.getIslandStatus(anchortarget);
-            if (status == 3) {
-                moveToward(anchortarget);
-                return ;
+        int currentIslandIndex = rc.senseIsland(rc.getLocation());
+        if (currentIslandIndex != -1 && rc.senseTeamOccupyingIsland(currentIslandIndex) == Team.NEUTRAL) {
+            if (rc.canPlaceAnchor()) {
+                rc.placeAnchor();
+                // on island so must can report
+                Comm.reportIsland(rc.getLocation(), currentIslandIndex, Comm.ISLAND_FRIENDLY);
+                tryFindMine();
             }
         }
-        MapLocation targetLoc = Comm.getClosestIsland();
+
+        // if visually see a target, focus on that first
+        int[] islands = rc.senseNearbyIslands();
+        int dis = targetLoc == null? Integer.MAX_VALUE : targetLoc.distanceSquaredTo(rc.getLocation());
+        for (int island : islands) {
+            if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
+                if (island == targetIslandIndex) {
+                    // the original target is not placable anymore
+                    targetIslandIndex = -1;
+                    targetLoc = null;
+                }
+                continue; // we can't place here
+            }
+            MapLocation locs[] = rc.senseNearbyIslandLocations(island);
+            for (MapLocation loc : locs) {
+                if (rc.getLocation().distanceSquaredTo(loc) < dis) {
+                    targetLoc = loc;
+                    targetIslandIndex = island;
+                    dis = rc.getLocation().distanceSquaredTo(loc);
+                }
+            }
+        }
+
+        // otherwise try to find target from Comm
         if (targetLoc == null) {
-            System.out.println("Available Island Not Found");
+            for (int i = 1; i <= islandCount; i++) {
+                MapLocation islandLocation = Comm.getIslandLocation(i);
+                if (islandLocation != null && Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL) {
+                    int islandDis = islandLocation.distanceSquaredTo(rc.getLocation());
+                    if (islandDis < dis) {
+                        dis = islandDis;
+                        targetLoc = islandLocation;
+                        targetIslandIndex = i;
+                    }
+                }
+            }
+        }
+
+        if (targetLoc == null) {
             randomMove();
         } else {
-            anchortarget = targetLoc;
-            Comm.reportIsland(targetLoc, Comm.getIslandIndex(targetLoc), 3);
-            indicator += targetLoc;
             moveToward(targetLoc);
         }
     }
@@ -280,7 +287,7 @@ public class Carrier extends Unit {
             scoutTarget = scoutCenter.translate(
                     (int)(Math.cos(scoutAngle) * scoutAngle),
                     (int)(Math.sin(scoutAngle) * scoutAngle));
-            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
+            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x * mapWidth + scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
                 success = true;
                 break;
             }
@@ -290,44 +297,28 @@ public class Carrier extends Unit {
     }
 
     private static void scoutMove() throws GameActionException {
-        if (purpose == SCOUT_SYMMETRY && Comm.isSymmetryConfirmed) {
-            state = REPORTING_INFO;
-            return;
-        }
-
         if ((purpose == MINE_AD || purpose == MINE_MN) && tryFindMine()) {
             state = REPORTING_INFO;
             return;
         }
 
-        if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
-            if (!setScoutTarget() && purpose != SCOUT_SYMMETRY) {
-                System.out.println("miner out of mine after exploring map, disintegrate");
-                rc.disintegrate();
-                return;
-            }
-        }
-
-        if (purpose == SCOUT_SYMMETRY && (rc.getRoundNum() - scoutStartRound >= 70 || scoutTarget == null)) {
-            // if I have been scouting for 30 turns consecutively and everything the same, it really doesn't matter
-            System.out.println("sym scout too long, eliminate sym arbitrarily");
-            for (int sym = 2; sym >= 0 && !Comm.isSymmetryConfirmed; sym--) {
-                Comm.eliminateSym(sym);
-            }
-            state = REPORTING_INFO;
+        if ((scoutTarget == null || (MapRecorder.vals[scoutTarget.x * mapWidth + scoutTarget.y] & MapRecorder.SEEN_BIT) != 0) && !setScoutTarget())  {
+            System.out.println("miner out of mine after exploring map, disintegrate");
+            rc.disintegrate();
             return;
         }
 
-        indicator += String.format("T%s,A%.1fPI,v%d", scoutTarget, scoutAngle / Math.PI, MapRecorder.vals[scoutTarget.x][scoutTarget.y]);
+        indicator += String.format("T%s,A%.1fPI", scoutTarget, scoutAngle / Math.PI);
         moveToward(scoutTarget);
     }
 
-    private static boolean isNeedReport() {
+    private static boolean needReport() {
         return lastEnemyRound > (Comm.getEnemyRound() + 2)
                 || wellsToReport[ResourceType.ADAMANTIUM.resourceID].size > 0
                 || wellsToReport[ResourceType.MANA.resourceID].size > 0
                 || islandsToReport[0].size > 0
-                || Comm.needSymmetryReport;
+                || Comm.needSymmetryReport
+                || rc.getRoundNum() / Comm.CARRIER_REPORT_FREQ != lastCarrierReportRound / Comm.CARRIER_REPORT_FREQ;
     }
 
     private static void report() throws GameActionException {
@@ -353,13 +344,16 @@ public class Carrier extends Unit {
                 islandsToReport[status].clear();
             }
         }
-        
+        if (rc.getRoundNum() / Comm.CARRIER_REPORT_FREQ != lastCarrierReportRound / Comm.CARRIER_REPORT_FREQ) {
+            carrierID = Comm.carrierReport();
+            lastCarrierReportRound = rc.getRoundNum();
+        }
         Comm.reportSym();
         Comm.commit_write();
     }
 
     private static void handleReportState() throws GameActionException {
-        if (isNeedReport()) {
+        if (needReport()) {
             indicator += "2RP,";
             int closestHQID = getClosestID(Comm.friendlyHQLocations);
             if (!rc.canWriteSharedArray(0, 0) && rc.isMovementReady()) {
@@ -379,7 +373,7 @@ public class Carrier extends Unit {
         if (state == REPORT_AND_RUNAWAY) {
             state = RUNAWAY;
         } else { // reporting info
-            resumeWork();
+            tryFindMine();
         }
     }
 
@@ -387,7 +381,7 @@ public class Carrier extends Unit {
         if (state == RUNAWAY) {
             indicator += "RN,";
             if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
-                resumeWork();
+                tryFindMine();
             } else {
                 Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
                 Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
@@ -411,10 +405,6 @@ public class Carrier extends Unit {
     private static void collect() throws GameActionException {
         int hqid = getClosestID(Comm.friendlyHQLocations);
         miningHQLoc = Comm.friendlyHQLocations[hqid];
-        // may be able to collect twice per turn
-        if (rc.canCollectResource(miningWellLoc, -1)) {
-            rc.collectResource(miningWellLoc, -1);
-        }
         if (rc.canCollectResource(miningWellLoc, -1)) {
             rc.collectResource(miningWellLoc, -1);
         }
@@ -473,7 +463,6 @@ public class Carrier extends Unit {
             if (rc.getLocation().isAdjacentTo(miningWellLoc)) {
                 collect();
             }
-            indicator += String.format("2%s", miningWellLoc);
         }
     }
 
@@ -482,7 +471,6 @@ public class Carrier extends Unit {
         int mn = rc.getResourceAmount(ResourceType.MANA);
         if (!rc.getLocation().isAdjacentTo(miningHQLoc)) {
             moveToward(miningHQLoc);
-            indicator += String.format("2%s", miningHQLoc);
         }
         if (rc.getLocation().isAdjacentTo(miningHQLoc)) {
             if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
@@ -501,6 +489,19 @@ public class Carrier extends Unit {
 
     // this func transitions into either mining or scouting and returns true if the transition is to mining
     private static boolean tryFindMine() {
+        // decide what resource to mine
+        if (mapWidth * mapHeight <= 1000) {
+            miningResourceType = ResourceType.MANA; // mana only on small map
+        } else if (mapWidth * mapHeight <= 2000) {
+            miningResourceType = carrierID % 3 == 2? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        } else {
+            miningResourceType = carrierID % 2 == 1? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        }
+        if (rc.getWeight() > 10) {
+            // TODO maybe more complicated decision makings
+            state = DROPPING_RESOURCE;
+            return true;
+        }
         miningWellLoc = null;
         MapLocation congestedLocation = null;
         MapLocation dangerLocation = null;
@@ -556,25 +557,6 @@ public class Carrier extends Unit {
         } else {
             state = MINING;
             return true;
-        }
-    }
-
-    // after reporting info or running away
-    private static void resumeWork() {
-        if (purpose == MINE_AD || purpose == MINE_MN) {
-            miningResourceType = purpose == MINE_AD? ResourceType.ADAMANTIUM : ResourceType.MANA;
-            tryFindMine();
-        } else { // symmetry scouting
-            if (Comm.isSymmetryConfirmed) {
-                System.out.println("sym confirmed as sym scout, go mine");
-                purpose = (rng.nextInt(2) == 0? MINE_AD : MINE_MN);
-                miningResourceType = purpose == MINE_AD? ResourceType.ADAMANTIUM : ResourceType.MANA;
-                tryFindMine();
-            } else {
-                state = SCOUTING;
-                scoutCenter = new MapLocation(mapWidth / 2, mapHeight / 2);
-                scoutStartRound = rc.getRoundNum();
-            }
         }
     }
 

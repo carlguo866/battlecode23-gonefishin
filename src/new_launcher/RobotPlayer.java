@@ -1,4 +1,4 @@
-package launcher;
+package new_launcher;
 
 import battlecode.common.*;
 
@@ -13,6 +13,7 @@ import battlecode.common.*;
 public strictfp class RobotPlayer {
     static RobotController rc;
     static int turnCount;
+    static int islandCount;
 
     static int mapWidth, mapHeight;
 
@@ -36,6 +37,7 @@ public strictfp class RobotPlayer {
         oppTeam = rc.getTeam().opponent();
         mapWidth = rc.getMapWidth();
         mapHeight = rc.getMapHeight();
+        islandCount = rc.getIslandCount();
         turnCount = 0;
 
         while (true) {
@@ -71,8 +73,7 @@ public strictfp class RobotPlayer {
                 // Signify we've done everything we want to do, thereby ending our turn.
                 // This will make our code wait until the next turn, and then perform this loop again.
                 turnCount += 1;
-                // ignore carrier first turn running over
-                if (startRound != rc.getRoundNum() && rc.getType() != RobotType.CARRIER && turnCount != 1) {
+                if (startRound != rc.getRoundNum() && rc.getType() != RobotType.LAUNCHER) {
                     System.out.printf("overran turn from %d to %d\n", startRound, rc.getRoundNum());
                 }
                 Clock.yield();

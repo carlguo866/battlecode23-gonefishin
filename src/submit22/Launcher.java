@@ -1,7 +1,7 @@
-package new_launcher;
+package submit22;
 
 import battlecode.common.*;
-import new_launcher.util.FastIterableRobotInfoSet;
+import submit22.util.FastIterableRobotInfoSet;
 
 public class Launcher extends Unit {
     static class SimpleLauncherInfo {
@@ -65,7 +65,7 @@ public class Launcher extends Unit {
     static RobotInfo closestEnemy = null;
     static int ourTeamStrength = 1;
     static int ourTeamHealth = 0;
-    static int closeFriendsSize = 0; 
+    static int closeFriendsSize = 0;
 
     // macro vars
     static RobotInfo closestFriendlyLauncher = null;
@@ -122,14 +122,14 @@ public class Launcher extends Unit {
                 if (robot.type == RobotType.LAUNCHER) {
                     if (friendlyLaunchers.size < 6)
                         friendlyLaunchers.add(robot);
-                        if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4 ||
-                                (checkWall(rc.getLocation(), robot.getLocation())
-                                        && betterDistance(rc.getLocation(), robot.getLocation()) <= 9)){
-    //                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
-    //                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
-                            closeFriendsSize+=1;
-                            ourTeamHealth += (int) Math.ceil((double) robot.getHealth() / DAMAGE);
-                        }
+                    if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4 ||
+                            (checkWall(rc.getLocation(), robot.getLocation())
+                                    && betterDistance(rc.getLocation(), robot.getLocation()) <= 9)){
+                        //                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
+                        //                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
+                        closeFriendsSize+=1;
+                        ourTeamHealth += (int) Math.ceil((double) robot.getHealth() / DAMAGE);
+                    }
                     ourTeamStrength += 1;
 
                     if (closestFriendlyLauncher == null) {
@@ -220,18 +220,18 @@ public class Launcher extends Unit {
 //        }
 
 
-        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 3) && closeFriendsSize < 2
-            && groupingAttempt < 10) {
-            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
-                moveToward(closestFriendlyLauncher.location);
-                groupingAttempt+=1;
-                return;
-            } else if (closeFriendsSize == 0 && cachedFriendlyLauncher != null) {
-                moveToward(cachedFriendlyLauncher.location);
-                groupingAttempt+=1;
-                return;
-            }
-        }
+//        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 3) && closeFriendsSize < 2
+//                && groupingAttempt < 10) {
+//            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
+//                moveToward(closestFriendlyLauncher.location);
+//                groupingAttempt+=1;
+//                return;
+//            } else if (closeFriendsSize == 0 && cachedFriendlyLauncher != null) {
+//                moveToward(cachedFriendlyLauncher.location);
+//                groupingAttempt+=1;
+//                return;
+//            }
+//        }
 
         // If enemy reported recently that is close
         MapLocation enemyLocation = Comm.getEnemyLoc();
@@ -363,7 +363,7 @@ public class Launcher extends Unit {
                 // extraCheck == 2: go to a loc that can still attack
                 if (result == null) result = dir;
                 if ((rc.getLocation().add(result).distanceSquaredTo(loc)
-                                < rc.getLocation().add(dir).distanceSquaredTo(loc))) {
+                        < rc.getLocation().add(dir).distanceSquaredTo(loc))) {
                     result = dir;
                 }
             }

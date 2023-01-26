@@ -85,6 +85,10 @@ public class Launcher extends Unit {
             micro(true);
         }
         // have launchers perform sym check
+        if (Comm.needSymmetryReport && rc.canWriteSharedArray(0, 0)) {
+            Comm.reportSym();
+            Comm.commit_write();
+        }
         if (!Comm.isSymmetryConfirmed) {
             MapLocation symGuessLoc = getClosestLoc(Comm.enemyHQLocations);
             if (rc.canSenseLocation(symGuessLoc)) {
@@ -201,15 +205,10 @@ public class Launcher extends Unit {
         if (!rc.isMovementReady()) {
             return;
         }
-        if (Comm.isSymmetryConfirmed && Comm.needSymmetryReport && rc.getID() % 4 == 0) {
-            if (rc.canWriteSharedArray(0, 0)) {
-                Comm.reportSym();
-                Comm.commit_write();
-            } else if (rc.getID() % 4 == 0) { // only have a quarter of launchers go back to report
-                moveToward(getClosestLoc(Comm.friendlyHQLocations));
-                indicator += "gotsym";
-                return;
-            }
+        if (Comm.needSymmetryReport && rc.getRoundNum() > 150) {
+            moveToward(getClosestLoc(Comm.friendlyHQLocations));
+            indicator += "gotsym";
+            return;
         }
         indicator += String.format("size%d", closeFriendsSize);
 //        if (closestFriendlyLauncher != null) {

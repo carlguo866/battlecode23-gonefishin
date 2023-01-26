@@ -220,18 +220,18 @@ public class Launcher extends Unit {
 //        }
 
 
-//        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 3) && closeFriendsSize < 2
-//            && groupingAttempt < 10) {
-//            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
-//                moveToward(closestFriendlyLauncher.location);
-//                groupingAttempt+=1;
-//                return;
-//            } else if (closeFriendsSize == 0 && cachedFriendlyLauncher != null) {
-//                moveToward(cachedFriendlyLauncher.location);
-//                groupingAttempt+=1;
-//                return;
-//            }
-//        }
+        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 3) && closeFriendsSize < 2
+            && groupingAttempt < 10) {
+            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
+                moveToward(closestFriendlyLauncher.location);
+                groupingAttempt+=1;
+                return;
+            } else if (closeFriendsSize == 0 && cachedFriendlyLauncher != null) {
+                moveToward(cachedFriendlyLauncher.location);
+                groupingAttempt+=1;
+                return;
+            }
+        }
 
         // If enemy reported recently that is close
         MapLocation enemyLocation = Comm.getEnemyLoc();

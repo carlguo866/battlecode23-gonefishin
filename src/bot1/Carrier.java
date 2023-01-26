@@ -22,6 +22,9 @@ public class Carrier extends Unit {
 
     public static final int ANCHORING = 40;
 
+    public static int lastCarrierReportRound = -1000;
+    public static int carrierID = 0;
+
     public static int purpose = 0;
     public static int state = 0;
     public static ResourceType miningResourceType;
@@ -64,6 +67,10 @@ public class Carrier extends Unit {
             islandsSeen[Comm.ISLAND_ENEMY] = new FastIterableLocSet(35);
             islandsToReport[Comm.ISLAND_ENEMY] = new FastIterableLocSet(35);
 
+            if (rc.canWriteSharedArray(0, 0)) {
+                report(); // to get the carrier ID
+            }
+
             startHQID = getClosestID(Comm.friendlyHQLocations);
             startHQLoc = Comm.friendlyHQLocations[startHQID];
             scoutCenter = startHQLoc;
@@ -71,10 +78,10 @@ public class Carrier extends Unit {
             rng = new Random(rc.getID());
             purpose = rc.getID() % 4 == 0? MINE_AD : MINE_MN;
             updateWells();
-            resumeWork();
+            tryFindMine();
         }
 
-        indicator += String.format("P%dS%d,", purpose, state);
+        indicator += String.format("S%dR%s,", state, miningResourceType);
         checkAnchor();
         if (state == ANCHORING) {
             anchor();
@@ -112,7 +119,7 @@ public class Carrier extends Unit {
 
         // just try sense and report no matter what the role is
         scoutSense();
-        if (isNeedReport() && rc.canWriteSharedArray(0, 0)) {
+        if (needReport() && rc.canWriteSharedArray(0, 0)) {
             report();
         }
         MapRecorder.recordSym(500);
@@ -146,7 +153,6 @@ public class Carrier extends Unit {
                         if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.CARRIER_ATTACK_DIS
                                 && rc.canMove(dir)) {
                             rc.move(dir);
-                            assert rc.canAttack(closestEnemy.location);
                             indicator += "goattack,";
                             if (rc.canAttack(closestEnemy.location)) {
                                 rc.attack(closestEnemy.location);
@@ -323,12 +329,13 @@ public class Carrier extends Unit {
         moveToward(scoutTarget);
     }
 
-    private static boolean isNeedReport() {
+    private static boolean needReport() {
         return lastEnemyRound > (Comm.getEnemyRound() + 2)
                 || wellsToReport[ResourceType.ADAMANTIUM.resourceID].size > 0
                 || wellsToReport[ResourceType.MANA.resourceID].size > 0
                 || islandsToReport[0].size > 0
-                || Comm.needSymmetryReport;
+                || Comm.needSymmetryReport
+                || rc.getRoundNum() / Comm.CARRIER_REPORT_FREQ != lastCarrierReportRound / Comm.CARRIER_REPORT_FREQ;
     }
 
     private static void report() throws GameActionException {
@@ -354,13 +361,16 @@ public class Carrier extends Unit {
                 islandsToReport[status].clear();
             }
         }
-        
+        if (rc.getRoundNum() / Comm.CARRIER_REPORT_FREQ != lastCarrierReportRound / Comm.CARRIER_REPORT_FREQ) {
+            carrierID = Comm.carrierReport();
+            lastCarrierReportRound = rc.getRoundNum();
+        }
         Comm.reportSym();
         Comm.commit_write();
     }
 
     private static void handleReportState() throws GameActionException {
-        if (isNeedReport()) {
+        if (needReport()) {
             indicator += "2RP,";
             int closestHQID = getClosestID(Comm.friendlyHQLocations);
             if (!rc.canWriteSharedArray(0, 0) && rc.isMovementReady()) {
@@ -380,7 +390,7 @@ public class Carrier extends Unit {
         if (state == REPORT_AND_RUNAWAY) {
             state = RUNAWAY;
         } else { // reporting info
-            resumeWork();
+            tryFindMine();
         }
     }
 
@@ -388,7 +398,7 @@ public class Carrier extends Unit {
         if (state == RUNAWAY) {
             indicator += "RN,";
             if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
-                resumeWork();
+                tryFindMine();
             } else {
                 Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
                 Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
@@ -496,6 +506,14 @@ public class Carrier extends Unit {
 
     // this func transitions into either mining or scouting and returns true if the transition is to mining
     private static boolean tryFindMine() {
+        // decide what resource to mine
+        if (mapWidth * mapHeight <= 1000) {
+            miningResourceType = ResourceType.MANA; // mana only on small map
+        } else if (mapWidth * mapHeight <= 2000) {
+            miningResourceType = carrierID % 3 == 2? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        } else {
+            miningResourceType = carrierID % 2 == 1? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        }
         miningWellLoc = null;
         MapLocation congestedLocation = null;
         MapLocation dangerLocation = null;
@@ -551,25 +569,6 @@ public class Carrier extends Unit {
         } else {
             state = MINING;
             return true;
-        }
-    }
-
-    // after reporting info or running away
-    private static void resumeWork() {
-        if (purpose == MINE_AD || purpose == MINE_MN) {
-            miningResourceType = purpose == MINE_AD? ResourceType.ADAMANTIUM : ResourceType.MANA;
-            tryFindMine();
-        } else { // symmetry scouting
-            if (Comm.isSymmetryConfirmed) {
-                System.out.println("sym confirmed as sym scout, go mine");
-                purpose = (rng.nextInt(2) == 0? MINE_AD : MINE_MN);
-                miningResourceType = purpose == MINE_AD? ResourceType.ADAMANTIUM : ResourceType.MANA;
-                tryFindMine();
-            } else {
-                state = SCOUTING;
-                scoutCenter = new MapLocation(mapWidth / 2, mapHeight / 2);
-                scoutStartRound = rc.getRoundNum();
-            }
         }
     }
 

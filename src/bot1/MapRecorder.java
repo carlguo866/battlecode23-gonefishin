@@ -61,10 +61,6 @@ public class MapRecorder extends RobotPlayer {
                     isSym = (val | CURRENT_MASK) == (symVal | CURRENT_MASK)
                             && (symCurrent.ordinal() == (symVal & CURRENT_MASK));
                     if (!isSym) {
-                        int symX = (sym & 1) == 0 ? mapWidth - x - 1 : x;
-                        int symY = (sym & 2) == 0 ? mapHeight - y - 1 : y;
-                        char vv = vals[symX * mapWidth + symY];
-                        System.out.printf("elim sym %d at %d,%d:%x vs %d,%d:%x\n", sym, x, y, (int)val, symX, symY, (int)vv);
                         Comm.eliminateSym(sym);
                     }
                 }

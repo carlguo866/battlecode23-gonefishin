@@ -26,6 +26,10 @@ public class Headquarter extends Unit {
             MapRecorder.hqInit();
         }
 
+        if (rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ == 0 && hqid == 0) {
+            Comm.resetCarrierCnt();
+        }
+
         RobotInfo closestEnemy = null;
         int dis = Integer.MAX_VALUE;
         int enemyCount = 0;
@@ -74,7 +78,8 @@ public class Headquarter extends Unit {
             lastEnemyRound = rc.getRoundNum();
         }
         Comm.reportCongest(hqid, isCongested);
-        indicator += String.format("sym good %b local congest %b global congest %b", Comm.isSymmetryConfirmed, isCongested, Comm.isCongested());
+        indicator += String.format("#carrier %d sym %b local congest %b global congest %b",
+                Comm.getCarrierCnt(), Comm.isSymmetryConfirmed, isCongested, Comm.isCongested());
 
         boolean canBuildLauncher = true;
         if ((Comm.isCongested() || (rc.getRoundNum() > 1500 && rc.getRobotCount() / Comm.numHQ > 20))

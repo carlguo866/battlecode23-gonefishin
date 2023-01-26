@@ -32,9 +32,12 @@ public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int SYM_BIT = 48;
     private static final int CONGEST_BIT = 64;
+    private static final int CARRIER_REPORT_BIT = 80;
     private static final int WELL_INFO_BIT = 96;
     private static final int ENEMY_BIT = 487;
     private static final int ISLAND_BIT = 511;
+
+    private static final int CARRIER_REPORT_LEN = 16;
 
     public static final int ISLAND_NEUTRAL = 0;
     public static final int ISLAND_FRIENDLY = 1;
@@ -194,6 +197,20 @@ public class Comm extends RobotPlayer {
             writeBits(startingBit, 12, loc2int(wellLocation));
             needWellsUpdate = true;
         }
+    }
+
+    // Carrier report
+    public static final int CARRIER_REPORT_FREQ = 100;
+    public static int getCarrierCnt() {
+        return readBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN);
+    }
+    public static int carrierReport() {
+        int cnt = getCarrierCnt() + 1;
+        writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, cnt);
+        return cnt;
+    }
+    public static void resetCarrierCnt() {
+        writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, 0);
     }
 
     // enemy report starting

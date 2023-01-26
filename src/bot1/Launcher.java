@@ -97,8 +97,8 @@ public class Launcher extends Unit {
                     Comm.eliminateSym(Comm.symmetry);
                 }
             }
-            MapRecorder.recordSym(500);
         }
+        MapRecorder.recordSym(500);
     }
 
     static void sense(boolean isSecondTime) throws GameActionException {

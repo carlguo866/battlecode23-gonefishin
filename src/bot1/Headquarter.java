@@ -24,16 +24,6 @@ public class Headquarter extends Unit {
             }
             Comm.commit_write();
             MapRecorder.hqInit();
-
-            // only sym scout at the start of game on big maps with at least 2 HQs
-            if (mapWidth * mapHeight >= 1600 && hqid == 1) {
-                trySpawn(RobotType.CARRIER, new MapLocation(mapWidth / 2, mapHeight / 2), Carrier.SCOUT_SYMMETRY);
-            }
-        }
-
-        if (!Comm.isSymmetryConfirmed && turnCount > 0 && turnCount % 300 == 0) {
-            System.out.println("too long no sym, send another sym scout");
-            trySpawn(RobotType.CARRIER, new MapLocation(mapWidth / 2, mapHeight / 2), Carrier.SCOUT_SYMMETRY);
         }
 
         RobotInfo closestEnemy = null;
@@ -113,7 +103,7 @@ public class Headquarter extends Unit {
             for (int i = 5; --i >= 0
                     && rc.isActionReady()
                     && rc.getResourceAmount(ResourceType.MANA) >= Constants.LAUNCHER_COST_MN;) {
-                trySpawn(RobotType.LAUNCHER, new MapLocation(mapWidth / 2, mapHeight / 2), -1);
+                trySpawn(RobotType.LAUNCHER, new MapLocation(mapWidth / 2, mapHeight / 2));
             }
         }
         if (canBuildCarrier) {
@@ -121,7 +111,7 @@ public class Headquarter extends Unit {
             for (int i = 5; --i >= 0
                     && rc.isActionReady()
                     && rc.getResourceAmount(ResourceType.ADAMANTIUM) >= Constants.CARRIER_COST_AD;) {
-                trySpawn(RobotType.CARRIER, rc.getLocation(), ++carrierCnt % 3 == 0? Carrier.MINE_AD : Carrier.MINE_MN);
+                trySpawn(RobotType.CARRIER, rc.getLocation());
             }
         }
 
@@ -132,7 +122,7 @@ public class Headquarter extends Unit {
     }
 
     // if no need to set spawn flag pass -1
-    private static boolean trySpawn(RobotType robotType, MapLocation center, int spawnFlag) throws GameActionException {
+    private static boolean trySpawn(RobotType robotType, MapLocation center) throws GameActionException {
         MapLocation bestSpawn = null;
         for (int i = spawnableSet.size; --i >= 0;) {
             if ((bestSpawn == null || spawnableSet.locs[i].distanceSquaredTo(center) < bestSpawn.distanceSquaredTo(center))
@@ -145,10 +135,6 @@ public class Headquarter extends Unit {
             return false;
         }
         rc.buildRobot(robotType, bestSpawn);
-        if (spawnFlag > 0 && !Comm.trySetSpawnFlag(bestSpawn, spawnFlag)) {
-            System.out.println("try spawn failed Q full");
-            return false;
-        }
         return true;
     }
 }

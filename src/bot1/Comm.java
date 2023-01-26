@@ -19,12 +19,6 @@ import bot1.util.FastIterableIntSet;
  * each type containing 3 coords repping the 3 wells
  * 12 bits: well location
  *
- * spawn queue bit 208 - 463
- * length: 16
- * each of 16 bits, total of 256 bits
- * 12 bit: coord
- * 4 bit flag
- *
  * enemy report starting bit 464 - 487
  * each of:
  * 12 bit: coord
@@ -39,7 +33,6 @@ public class Comm extends RobotPlayer {
     private static final int SYM_BIT = 48;
     private static final int CONGEST_BIT = 64;
     private static final int WELL_INFO_BIT = 96;
-    private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 487;
     private static final int ISLAND_BIT = 511;
 
@@ -201,34 +194,6 @@ public class Comm extends RobotPlayer {
             writeBits(startingBit, 12, loc2int(wellLocation));
             needWellsUpdate = true;
         }
-    }
-
-    // spawn Q starts, works like a hashtable based on robot location int, collision goes to next pos
-    // can be further optimized to use int directly
-    public static int getSpawnFlag() throws GameActionException {
-        int robotLoc = loc2int(rc.getLocation());
-        for (int i = robotLoc; i < robotLoc + SPAWN_Q_LENGTH; i++) {
-            int val = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16);
-            if ((val >> 4) == robotLoc) {
-                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, 0);
-                commit_write();
-                return val & 0xF;
-            }
-        }
-        return 0;
-    }
-
-    public static boolean trySetSpawnFlag(MapLocation loc, int flag) {
-        int locVal = loc2int(loc);
-        for (int i = locVal; i < locVal + SPAWN_Q_LENGTH; i++) {
-            int oldLoc = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 12);
-            if (oldLoc == 0) {
-                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, (locVal << 4) | flag);
-                return true;
-            }
-        }
-        System.out.println("spawn Q full");
-        return false;
     }
 
     // enemy report starting

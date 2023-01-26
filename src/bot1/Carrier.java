@@ -10,7 +10,6 @@ public class Carrier extends Unit {
     // purposes
     public static final int MINE_MN = 1; // mining is default
     public static final int MINE_AD = 2;
-    public static final int SCOUT_SYMMETRY = 3;
 
     public static final int MINING = 10;
     public static final int DROPPING_RESOURCE = 11;
@@ -70,11 +69,7 @@ public class Carrier extends Unit {
             scoutCenter = startHQLoc;
 
             rng = new Random(rc.getID());
-            purpose = Comm.getSpawnFlag();
-            if (purpose == 0) {
-                purpose = MINE_MN;
-                System.out.println("Carrier spawn Q no flag");
-            }
+            purpose = rc.getID() % 4 == 0? MINE_AD : MINE_MN;
             updateWells();
             resumeWork();
         }
@@ -87,11 +82,6 @@ public class Carrier extends Unit {
         }
 
         if (state == SCOUTING) {
-            if (purpose == SCOUT_SYMMETRY) {
-                MapRecorder.recordSym(4000);
-            } else {
-                MapRecorder.recordFast(4000);
-            }
             scoutSense();
         }
         senseEnemy();
@@ -125,9 +115,7 @@ public class Carrier extends Unit {
         if (isNeedReport() && rc.canWriteSharedArray(0, 0)) {
             report();
         }
-        if (purpose != SCOUT_SYMMETRY) {
-            MapRecorder.recordFast(500);
-        }
+        MapRecorder.recordSym(500);
     }
 
     // sense and attack nearby enemies
@@ -310,7 +298,7 @@ public class Carrier extends Unit {
             scoutTarget = scoutCenter.translate(
                     (int)(Math.cos(scoutAngle) * scoutAngle),
                     (int)(Math.sin(scoutAngle) * scoutAngle));
-            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
+            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x * mapWidth + scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
                 success = true;
                 break;
             }
@@ -320,35 +308,18 @@ public class Carrier extends Unit {
     }
 
     private static void scoutMove() throws GameActionException {
-        if (purpose == SCOUT_SYMMETRY && Comm.isSymmetryConfirmed) {
-            state = REPORTING_INFO;
-            return;
-        }
-
         if ((purpose == MINE_AD || purpose == MINE_MN) && tryFindMine()) {
             state = REPORTING_INFO;
             return;
         }
 
-        if (scoutTarget == null || (MapRecorder.vals[scoutTarget.x][scoutTarget.y] & MapRecorder.SEEN_BIT) != 0)  {
-            if (!setScoutTarget() && purpose != SCOUT_SYMMETRY) {
-                System.out.println("miner out of mine after exploring map, disintegrate");
-                rc.disintegrate();
-                return;
-            }
-        }
-
-        if (purpose == SCOUT_SYMMETRY && (rc.getRoundNum() - scoutStartRound >= 70 || scoutTarget == null)) {
-            // if I have been scouting for 30 turns consecutively and everything the same, it really doesn't matter
-            System.out.println("sym scout too long, eliminate sym arbitrarily");
-            for (int sym = 2; sym >= 0 && !Comm.isSymmetryConfirmed; sym--) {
-                Comm.eliminateSym(sym);
-            }
-            state = REPORTING_INFO;
+        if ((scoutTarget == null || (MapRecorder.vals[scoutTarget.x * mapWidth + scoutTarget.y] & MapRecorder.SEEN_BIT) != 0) && !setScoutTarget())  {
+            System.out.println("miner out of mine after exploring map, disintegrate");
+            rc.disintegrate();
             return;
         }
 
-        indicator += String.format("T%s,A%.1fPI,v%d", scoutTarget, scoutAngle / Math.PI, MapRecorder.vals[scoutTarget.x][scoutTarget.y]);
+        indicator += String.format("T%s,A%.1fPI", scoutTarget, scoutAngle / Math.PI);
         moveToward(scoutTarget);
     }
 

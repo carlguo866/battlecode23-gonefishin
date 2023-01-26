@@ -269,13 +269,14 @@ public class Launcher extends Unit {
             }
             if (rc.isMovementReady()) {
                 // move toward enemy if sensed an enemy outside attack range
-//                if (rc.isActionReady() && (ourTeamStrength >= 0 ||
-//                        (ourTeamStrength==0 && rc.getHealth() > closestEnemy.getHealth()))) {
-//                    chase(attackTarget);
-//                } else {
+                if (rc.isActionReady() && (ourTeamStrength >= 0 ||
+                        (ourTeamStrength==0 && rc.getHealth() > closestEnemy.getHealth()))) {
+                    chase(attackTarget);
+                }
+                else {
                     // if at disadvantage pull back
-                if (closestEnemy != null) {
-                    kite(closestEnemy.location, 0);
+                    if (closestEnemy != null) {
+                        kite(closestEnemy.location, 0);
 //                    if (ourTeamStrength < -1 || rc.getHealth() < closestEnemy.health
 //                        || (ourTeamStrength == 0 && ourTeamHealth < 0)){
 //                        indicator += String.format("run%d", closestEnemy.health-rc.getHealth());
@@ -294,8 +295,8 @@ public class Launcher extends Unit {
 ////                            // if I can back off to a location that I can still attack from, kite back
 ////                            kite(attackTarget, 2);
 ////                        }
+                    }
                 }
-//                }
             }
             if (isSecondTime) {
                 cachedAttackTarget = new SimpleLauncherInfo(attackTarget, attackTargetHealth-1, 0);

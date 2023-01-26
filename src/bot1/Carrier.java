@@ -129,54 +129,37 @@ public class Carrier extends Unit {
     private static void senseEnemy() throws GameActionException {
         closestEnemy = null;
         int dis = Integer.MAX_VALUE;
+        int strength = 0;
         for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
             if (robot.type == RobotType.LAUNCHER) {
                 int newDis = robot.location.distanceSquaredTo(rc.getLocation());
                 if (closestEnemy == null || newDis < dis) {
                     dis = newDis;
                     closestEnemy = robot;
+                    strength -= robot.health;
                 }
             }
         }
         if (closestEnemy != null) {
+            for (RobotInfo robot : rc.senseNearbyRobots(closestEnemy.location, 16, myTeam)) {
+                if (robot.type == RobotType.LAUNCHER) {
+                    strength += robot.health;
+                }
+            }
+            if (strength > 0) {
+                return;
+            }
             lastEnemyLoc = closestEnemy.location;
             lastEnemyRound = rc.getRoundNum();
+            if (state == MINING || state == DROPPING_RESOURCE) {
+                lastEnemyOnMine.remove(miningWellLoc);
+                lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
+            }
+            // try preserve the resource, unless too close, TODO if against a wall maybe just attack
+            state = RUNAWAY;
             if (rc.canAttack(closestEnemy.location)) {
                 indicator += "attack,";
                 rc.attack(closestEnemy.location);
-            } else { // no resource or too far away
-                if (rc.getWeight() >= 20) { // ow not worth it to get close to attack
-                    Direction forwardDir = rc.getLocation().directionTo(closestEnemy.location);
-                    Direction[] dirs = {forwardDir.rotateRight().rotateRight(), forwardDir.rotateLeft().rotateLeft(),
-                            forwardDir.rotateLeft(), forwardDir.rotateRight(), forwardDir};
-                    for (Direction dir : dirs) {
-                        if (rc.getLocation().add(dir).distanceSquaredTo(closestEnemy.location) <= Constants.CARRIER_ATTACK_DIS
-                                && rc.canMove(dir)) {
-                            rc.move(dir);
-                            indicator += "goattack,";
-                            if (rc.canAttack(closestEnemy.location)) {
-                                rc.attack(closestEnemy.location);
-                            }
-                        }
-                    }
-                }
-                // If I can move and still have stuff, throw it all away, just don't hit a teammate
-                if (rc.isMovementReady() && rc.getWeight() > 0) {
-                    for (int i = 1; i <= 20; i++) {
-                        MapLocation loc = new MapLocation(rc.getLocation().x + BFS25[i][0],
-                                rc.getLocation().y + BFS25[i][1]);
-                        if (rc.onTheMap(loc) && rc.canSenseLocation(loc)) {
-                            RobotInfo robot = rc.senseRobotAtLocation(loc);
-                            if (robot == null || robot.team != myTeam || robot.type == RobotType.HEADQUARTERS) {
-                                if (rc.canAttack(loc)) {
-                                    rc.attack(loc);
-                                    indicator += String.format("throw %s,", loc);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
             }
             if (state == MINING || state == DROPPING_RESOURCE) {
                 lastEnemyOnMine.remove(miningWellLoc);
@@ -513,6 +496,11 @@ public class Carrier extends Unit {
             miningResourceType = carrierID % 3 == 2? ResourceType.ADAMANTIUM : ResourceType.MANA;
         } else {
             miningResourceType = carrierID % 2 == 1? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        }
+        if (rc.getWeight() > 10) {
+            // TODO maybe more complicated decision makings
+            state = DROPPING_RESOURCE;
+            return true;
         }
         miningWellLoc = null;
         MapLocation congestedLocation = null;

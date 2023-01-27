@@ -206,8 +206,18 @@ public class Unit extends RobotPlayer {
         lastPathingTurn = turnCount;
     }
 
+    static int getSteps(MapLocation a, MapLocation b) {
+        int xdif = a.x - b.x;
+        int ydif = a.y - b.y;
+        if (xdif < 0) xdif = -xdif;
+        if (ydif < 0) ydif = -ydif;
+        if (xdif > ydif) return xdif;
+        else return ydif;
+    }
+
     private static Direction[] prv_ = new Direction[PRV_LENGTH];
     private static int pathingCnt_ = 0;
+    static int MAX_DEPTH = 20;
     static int getTurnDir(Direction dir) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;
@@ -218,7 +228,7 @@ public class Unit extends RobotPlayer {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateLeft();
-            if (pathingCnt_ > 30) {
+            if (pathingCnt_ > MAX_DEPTH) {
                 break;
             }
         }
@@ -226,30 +236,33 @@ public class Unit extends RobotPlayer {
         
         while (pathingCnt_ > 0) {
             moveLeft++;
+            if (moveLeft > MAX_DEPTH) {
+                break;
+            }
             while (pathingCnt_ > 0 && MapRecorder.check(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
                 pathingCnt_--;
             }
             while (pathingCnt_ > 0 && !MapRecorder.check(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
                 pathingCnt_++;
-                if (pathingCnt_ > 30) {
+                if (pathingCnt_ > MAX_DEPTH) {
                     break;
                 }
             }
-            if (pathingCnt_ > 30) {
+            if (pathingCnt_ > MAX_DEPTH) {
                 break;
             }
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateLeft();
             now = now.add(moveDir);
         }
-
+        MapLocation leftend = now;
         pathingCnt_ = 0;
         now = rc.getLocation();
         while (!canPass(dir) && pathingCnt_ != 8) {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateRight();
-            if (pathingCnt_ > 30) {
+            if (pathingCnt_ > MAX_DEPTH) {
                 break;
             }
         }
@@ -257,24 +270,27 @@ public class Unit extends RobotPlayer {
         
         while (pathingCnt_ > 0) {
             moveRight++;
+            if (moveRight > MAX_DEPTH) {
+                break;
+            }
             while (pathingCnt_ > 0 && MapRecorder.check(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
                 pathingCnt_--;
             }
             while (pathingCnt_ > 0 && !MapRecorder.check(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();
                 pathingCnt_++;
-                if (pathingCnt_ > 30) {
+                if (pathingCnt_ > MAX_DEPTH) {
                     break;
                 }
             }
-            if (pathingCnt_ > 30) {
+            if (pathingCnt_ > MAX_DEPTH) {
                 break;
             }
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateRight();
             now = now.add(moveDir);
         }
-
-        if (moveLeft >= moveRight) return 0;
+        MapLocation rightend = now;
+        if (moveLeft + getSteps(leftend, rc.getLocation()) >= moveRight + getSteps(rightend, rc.getLocation())) return 0;
         else return 1;
     }
 

@@ -114,7 +114,7 @@ public class Unit extends RobotPlayer {
                 stuckCnt = 0;
             }
             lastLocation = rc.getLocation();
-            if (stuckCnt >= 3) {
+            if (stuckCnt >= 2) {
                 indicator += "stuck reset";
                 randomMove();
                 pathingCnt = 0;
@@ -137,11 +137,11 @@ public class Unit extends RobotPlayer {
 
             if (pathingCnt == 0) {
                 Direction dir = rc.getLocation().directionTo(location);
-                if (canPass(dir) || canPass(dir.rotateRight(), dir) || canPass(dir.rotateLeft(), dir)) {
+                if (canPass(dir)) {
                     currentTurnDir = 0;
                     tryMoveDir(dir);
                 } else {
-                    currentTurnDir = getTurnDir(dir);
+                    currentTurnDir = getTurnDir(dir, location);
                     while (!canPass(dir) && pathingCnt != 8) {
                         prv[pathingCnt] = dir;
                         pathingCnt++;
@@ -217,14 +217,14 @@ public class Unit extends RobotPlayer {
 
     private static Direction[] prv_ = new Direction[PRV_LENGTH];
     private static int pathingCnt_ = 0;
-    static int MAX_DEPTH = 18;
-    static int getTurnDir(Direction dir) throws GameActionException{
+    static int MAX_DEPTH = 16;
+    static int getTurnDir(Direction dir, MapLocation target) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;
         int moveRight = 0;
         
         pathingCnt_ = 0;
-        while (!MapRecorder.check(now.add(dir), dir) && pathingCnt_ != 8) {
+        while (!canPass(now.add(dir), dir) && pathingCnt_ != 8) {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateLeft();
@@ -239,10 +239,10 @@ public class Unit extends RobotPlayer {
             if (moveLeft > MAX_DEPTH) {
                 break;
             }
-            while (pathingCnt_ > 0 && MapRecorder.check(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
+            while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
                 pathingCnt_--;
             }
-            while (pathingCnt_ > 0 && !MapRecorder.check(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
+            while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
                 pathingCnt_++;
                 if (pathingCnt_ > MAX_DEPTH) {
@@ -273,10 +273,10 @@ public class Unit extends RobotPlayer {
             if (moveRight > MAX_DEPTH) {
                 break;
             }
-            while (pathingCnt_ > 0 && MapRecorder.check(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
+            while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
                 pathingCnt_--;
             }
-            while (pathingCnt_ > 0 && !MapRecorder.check(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
+            while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();
                 pathingCnt_++;
                 if (pathingCnt_ > MAX_DEPTH) {
@@ -291,8 +291,22 @@ public class Unit extends RobotPlayer {
         }
         MapLocation rightend = now;
         if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return 0;
-        if (moveLeft + getSteps(leftend, rc.getLocation()) <= moveRight + getSteps(rightend, rc.getLocation())) return 0;
+        if (moveLeft + getSteps(leftend, target) <= moveRight + getSteps(rightend, target)) return 0;
         else return 1;
+    }
+
+    static boolean canPass(MapLocation loc, Direction targetDir) throws GameActionException {
+        if (!MapRecorder.check(loc, targetDir)) return false;
+        
+        if (getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
+            return false;
+        }
+        
+        if (!rc.canSenseLocation(loc)) return true;
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        if (robot != null)
+            return false; 
+        return true;
     }
 
     static boolean canPass(Direction dir, Direction targetDir) throws GameActionException {

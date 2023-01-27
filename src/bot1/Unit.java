@@ -217,7 +217,7 @@ public class Unit extends RobotPlayer {
 
     private static Direction[] prv_ = new Direction[PRV_LENGTH];
     private static int pathingCnt_ = 0;
-    static int MAX_DEPTH = 20;
+    static int MAX_DEPTH = 18;
     static int getTurnDir(Direction dir) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;
@@ -290,7 +290,8 @@ public class Unit extends RobotPlayer {
             now = now.add(moveDir);
         }
         MapLocation rightend = now;
-        if (moveLeft + getSteps(leftend, rc.getLocation()) >= moveRight + getSteps(rightend, rc.getLocation())) return 0;
+        if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return 0;
+        if (moveLeft + getSteps(leftend, rc.getLocation()) <= moveRight + getSteps(rightend, rc.getLocation())) return 0;
         else return 1;
     }
 

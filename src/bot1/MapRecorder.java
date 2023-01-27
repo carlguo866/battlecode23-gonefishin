@@ -15,6 +15,23 @@ public class MapRecorder extends RobotPlayer {
 
     public static char[] vals = Constants.MAP_LEN_STRING.toCharArray();
 
+    public static boolean check(MapLocation loc, Direction targetDir) throws GameActionException {
+        if (!rc.onTheMap(loc))
+            return false;
+        int val = vals[loc.x * mapWidth + loc.y];
+        if ((val & SEEN_BIT) == 0)
+            return true;
+        if ((val & PASSIABLE_BIT) == 0)
+            return false;
+        if (rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12) {
+            return true;
+        }
+        else {
+            Direction current = Direction.values()[val & CURRENT_MASK];
+            return (current == targetDir || current == targetDir.rotateLeft() || current == targetDir.rotateRight() || current == Direction.CENTER);
+        }
+    }
+
     public static void recordSym(int leaveBytecodeCnt) throws GameActionException {
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {

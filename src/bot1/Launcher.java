@@ -70,6 +70,7 @@ public class Launcher extends Unit {
     // macro vars
     static RobotInfo closestFriendlyLauncher = null;
     static int lastEnemySensedRound = -100;
+    static int lastSym;
 
     static FastIterableRobotInfoSet friendlyLaunchers = new FastIterableRobotInfoSet();
     static FastIterableRobotInfoSet enemyLaunchers = new FastIterableRobotInfoSet();
@@ -78,6 +79,7 @@ public class Launcher extends Unit {
         if (turnCount == 0) {
             // future: get from spawn queue if there are more than one roles
             // prioritize the closest enemy HQ
+            lastSym = Comm.symmetry;
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
@@ -247,6 +249,11 @@ public class Launcher extends Unit {
                 indicator += String.format("M2E@%s", enemyLocation);
             }
         } else {
+            if (lastSym != Comm.symmetry) {
+                // recaculate the closest HQ when sym changes
+                lastSym = Comm.symmetry;
+                enemyHQID = getClosestID(Comm.enemyHQLocations);
+            }
             // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
             if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
                 for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
@@ -256,7 +263,7 @@ public class Launcher extends Unit {
                     }
                 }
             }
-            enemyHQLoc = Comm.enemyHQLocations[enemyHQID]; // in case symmetry changes...
+            enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
             indicator += String.format("M2EHQ@%s", enemyHQLoc);
             moveToward(enemyHQLoc);
         }

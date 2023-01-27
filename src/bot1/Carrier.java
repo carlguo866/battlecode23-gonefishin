@@ -287,7 +287,7 @@ public class Carrier extends Unit {
             scoutTarget = scoutCenter.translate(
                     (int)(Math.cos(scoutAngle) * scoutAngle),
                     (int)(Math.sin(scoutAngle) * scoutAngle));
-            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x * mapWidth + scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
+            if (rc.onTheMap(scoutTarget) && (MapRecorder.vals[scoutTarget.x * mapHeight + scoutTarget.y] & MapRecorder.SEEN_BIT) == 0) {
                 success = true;
                 break;
             }
@@ -302,7 +302,7 @@ public class Carrier extends Unit {
             return;
         }
 
-        if ((scoutTarget == null || (MapRecorder.vals[scoutTarget.x * mapWidth + scoutTarget.y] & MapRecorder.SEEN_BIT) != 0) && !setScoutTarget())  {
+        if ((scoutTarget == null || (MapRecorder.vals[scoutTarget.x * mapHeight + scoutTarget.y] & MapRecorder.SEEN_BIT) != 0) && !setScoutTarget())  {
             System.out.println("miner out of mine after exploring map, disintegrate");
             rc.disintegrate();
             return;

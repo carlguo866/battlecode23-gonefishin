@@ -18,7 +18,7 @@ public class MapRecorder extends RobotPlayer {
     public static boolean check(MapLocation loc, Direction targetDir) throws GameActionException {
         if (!rc.onTheMap(loc))
             return false;
-        int val = vals[loc.x * mapWidth + loc.y];
+        int val = vals[loc.x * mapHeight + loc.y];
         if ((val & SEEN_BIT) == 0)
             return true;
         if ((val & PASSIABLE_BIT) == 0)
@@ -38,7 +38,7 @@ public class MapRecorder extends RobotPlayer {
             if (Clock.getBytecodesLeft() <= leaveBytecodeCnt) {
                 return;
             }
-            if ((vals[infos[i].getMapLocation().x * mapWidth + infos[i].getMapLocation().y] & SEEN_BIT) != 0)
+            if ((vals[infos[i].getMapLocation().x * mapHeight + infos[i].getMapLocation().y] & SEEN_BIT) != 0)
                 continue;
             MapInfo info = infos[i];
             int x = info.getMapLocation().x;
@@ -60,7 +60,7 @@ public class MapRecorder extends RobotPlayer {
                 for (int sym = 3; --sym >= 0; ) {
                     if (Comm.isSymEliminated[sym])
                         continue;
-                    symVal = vals[((sym & 1) == 0 ? mapWidth - x - 1 : x) * mapWidth + ((sym & 2) == 0 ? mapHeight - y - 1 : y)];
+                    symVal = vals[((sym & 1) == 0 ? mapWidth - x - 1 : x) * mapHeight + ((sym & 2) == 0 ? mapHeight - y - 1 : y)];
                     if ((symVal & SEEN_BIT) == 0) {
                         continue;
                     }
@@ -82,7 +82,7 @@ public class MapRecorder extends RobotPlayer {
                     }
                 }
             }
-            vals[x * mapWidth + y] = val;
+            vals[x * mapHeight + y] = val;
         }
     }
 
@@ -94,7 +94,7 @@ public class MapRecorder extends RobotPlayer {
             if (!rc.onTheMap(loc)) {
                 continue;
             }
-            char val = vals[loc.x * mapWidth + loc.y];
+            char val = vals[loc.x * mapHeight + loc.y];
             if ((val & SEEN_BIT) == 0) {
                 set.add(loc);
             } else {
@@ -104,7 +104,7 @@ public class MapRecorder extends RobotPlayer {
                 Direction dir = Direction.values()[val & CURRENT_MASK];
                 MapLocation blowInto = loc.add(dir);
                 if (blowInto.isAdjacentTo(mineLoc) ||
-                        (rc.onTheMap(blowInto) && (vals[blowInto.x * mapWidth + blowInto.y] & PASSIABLE_BIT) == 0 && (vals[blowInto.x * mapWidth + blowInto.y] & SEEN_BIT) != 0)) {
+                        (rc.onTheMap(blowInto) && (vals[blowInto.x * mapHeight + blowInto.y] & PASSIABLE_BIT) == 0 && (vals[blowInto.x * mapHeight + blowInto.y] & SEEN_BIT) != 0)) {
                     set.add(loc);
                 }
             }
@@ -120,7 +120,7 @@ public class MapRecorder extends RobotPlayer {
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {
             if (infos[i].isPassable()) {
-                vals[infos[i].getMapLocation().x * mapWidth + infos[i].getMapLocation().y] = PASSIABLE_BIT;
+                vals[infos[i].getMapLocation().x * mapHeight + infos[i].getMapLocation().y] = PASSIABLE_BIT;
                 Headquarter.sensablePassibleArea++;
             }
         }
@@ -132,7 +132,7 @@ public class MapRecorder extends RobotPlayer {
         for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
             int x = hqX + HQ_SPAWNABLE_DX[i];
             int y = hqY + HQ_SPAWNABLE_DY[i];
-            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x * mapWidth + y] & PASSIABLE_BIT) == 0)
+            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x * mapHeight + y] & PASSIABLE_BIT) == 0)
                 continue;
             if (spawnableSet.contains(x + 1, y)) {spawnableSet.add(x, y); continue;}
             if (spawnableSet.contains(x + 1, y + 1)) {spawnableSet.add(x, y); continue;}

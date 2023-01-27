@@ -1,4 +1,4 @@
-package launcher.util;
+package new_launcher.util;
 
 import battlecode.common.MapLocation;
 import battlecode.common.RobotInfo;

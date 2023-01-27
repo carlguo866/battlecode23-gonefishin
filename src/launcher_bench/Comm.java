@@ -1,6 +1,7 @@
-package launcher;
+package launcher_bench;
 
 import battlecode.common.*;
+import launcher_bench.util.FastIterableIntSet;
 
 /***
  *
@@ -11,18 +12,12 @@ import battlecode.common.*;
  * 0-47: 4*2 6bits int specifying the coord of friendly HQs
  * 48-50: 3 bit whether symmetries of the map have been eliminated:
  * [ROTATIONAL, VERTIAL, HORIZONTAL]
- * 51-54: 4 bits indicating whether the 4 HQs are congested
+ * 64-67: 4 bits indicating whether the 4 HQs are congested
  *
  * well info 96-203 bits
  * wells info starting bit 96 of 3 types, each 36 bits total 108 bits
  * each type containing 3 coords repping the 3 wells
  * 12 bits: well location
- *
- * spawn queue bit 208 - 463
- * length: 16
- * each of 16 bits, total of 256 bits
- * 12 bit: coord
- * 4 bit flag
  *
  * enemy report starting bit 464 - 487
  * each of:
@@ -36,16 +31,21 @@ import battlecode.common.*;
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
     private static final int SYM_BIT = 48;
-    private static final int CONGEST_BIT = 51;
+    private static final int CONGEST_BIT = 64;
+    private static final int CARRIER_REPORT_BIT = 80;
     private static final int WELL_INFO_BIT = 96;
-    private static final int SPAWN_Q_BIT = 208;
     private static final int ENEMY_BIT = 487;
     private static final int ISLAND_BIT = 511;
 
+    private static final int CARRIER_REPORT_LEN = 16;
+
+    public static final int ISLAND_NEUTRAL = 0;
+    public static final int ISLAND_FRIENDLY = 1;
+    public static final int ISLAND_ENEMY = 2;
+    public static final int ISLAND_ON_THE_WAY = 3; // carrier is on the way
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
-    private static boolean[] is_array_changed = new boolean[ARRAY_LENGTH];
-    private static boolean is_array_changed_total = false;
+    private static FastIterableIntSet changedIndexes = new FastIterableIntSet(ARRAY_LENGTH);
 
     private static boolean needWellsUpdate = false;
 
@@ -91,14 +91,13 @@ public class Comm extends RobotPlayer {
 
     // IMPORTANT: always ensure that any write op is performed when writable
     public static void commit_write() throws GameActionException {
-        if (is_array_changed_total) {
-            for (int i = 0; i < ARRAY_LENGTH; i++) {
-                if (is_array_changed[i]) {
-                    rc.writeSharedArray(i, buffered_share_array[i]);
-                    is_array_changed[i] = false;
-                }
+        if (changedIndexes.size > 0) {
+            changedIndexes.updateIterable();
+            int[] indexes = changedIndexes.ints;
+            for (int i = changedIndexes.size; --i>=0;) {
+                rc.writeSharedArray(indexes[i], buffered_share_array[indexes[i]]);
             }
-            is_array_changed_total = false;
+            changedIndexes.clear();
         }
     }
 
@@ -110,6 +109,7 @@ public class Comm extends RobotPlayer {
             if (friendlyHQLocations[i] == null) {
                 friendlyHQLocations[i] = location;
                 writeBits(i * 12, 12, loc2int(location));
+                numHQ = i + 1;
                 return i;
             }
         }
@@ -199,32 +199,18 @@ public class Comm extends RobotPlayer {
         }
     }
 
-    // spawn Q starts, works like a hashtable based on robot location int, collision goes to next pos
-    // can be further optimized to use int directly
-    public static int getSpawnFlag() throws GameActionException {
-        int robotLoc = loc2int(rc.getLocation());
-        for (int i = robotLoc; i < robotLoc + SPAWN_Q_LENGTH; i++) {
-            int val = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16);
-            if ((val >> 4) == robotLoc) {
-                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, 0);
-                commit_write();
-                return val & 0xF;
-            }
-        }
-        return 0;
+    // Carrier report
+    public static final int CARRIER_REPORT_FREQ = 100;
+    public static int getCarrierCnt() {
+        return readBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN);
     }
-
-    public static boolean trySetSpawnFlag(MapLocation loc, int flag) {
-        int locVal = loc2int(loc);
-        for (int i = locVal; i < locVal + SPAWN_Q_LENGTH; i++) {
-            int oldLoc = readBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 12);
-            if (oldLoc == 0) {
-                writeBits(SPAWN_Q_BIT + 16 * (i % SPAWN_Q_LENGTH), 16, (locVal << 4) | flag);
-                return true;
-            }
-        }
-        System.out.println("spawn Q full");
-        return false;
+    public static int carrierReport() {
+        int cnt = getCarrierCnt() + 1;
+        writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, cnt);
+        return cnt;
+    }
+    public static void resetCarrierCnt() {
+        writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, 0);
     }
 
     // enemy report starting
@@ -251,39 +237,43 @@ public class Comm extends RobotPlayer {
             if (val == 0) continue;
             MapLocation loc = int2loc((val - val % 4) / 4);
             if (loc.x == t.x && loc.y == t.y) {
-                return i;
+                return (i+1);
             }
         }
-        return -1;
-    }
-    public static int getIslandStatus(MapLocation loc) {
-        int index = getIslandIndex(loc);
-        return readBits(ISLAND_BIT + (index-1) * 14, 14) % 4;
+        System.out.println("ISLAND NOT FOUND IN COMM");
+        return 36;
     }
 
-    public static void reportIsland(MapLocation loc, int index, int status) {
+    public static MapLocation getIslandLocation(int index) {
+        return int2loc(readBits(ISLAND_BIT + (index - 1) * 14, 12));
+    }
+
+    public static int getIslandStatus(int index) {
+        return readBits(ISLAND_BIT + (index - 1) * 14 + 12, 2);
+    }
+
+    public static void reportIsland(MapLocation loc, int index, int status) throws GameActionException{
         //storing island index i at (i-1) since island indexes starts at 1
-        int val = readBits(ISLAND_BIT + (index-1) * 14, 14);
+        int val = readBits(ISLAND_BIT + (index - 1) * 14, 14);
         if (val != 0 && val % 4 == status) {
             return;
         }
         if (val % 4 == 3 && status == 0) {
             return;
         }
-        System.out.print("Found Island at ");
-        System.out.println(loc);
         writeBits(ISLAND_BIT + (index-1) * 14, 14, (loc2int(loc) * 4) + status);
+        commit_write();
     }
 
     public static MapLocation getClosestIsland() {
         MapLocation targetLoc = null;
         int dis = Integer.MAX_VALUE;
-        for (int i = 0; i < 35; i++) {
+        for (int i = 0; i < islandCount; i++) {
             int val = readBits(ISLAND_BIT + i * 14, 14);
-            if (val == 0 || val % 4 != 0) {
+            if (val == 0 || val % 4 == ISLAND_FRIENDLY) {
                 continue;
             }
-            MapLocation loc = int2loc((val - val % 4) / 4);
+            MapLocation loc = int2loc(val >> 2);
             if (rc.getLocation().distanceSquaredTo(loc) < dis) {
                 targetLoc = loc;
                 dis = rc.getLocation().distanceSquaredTo(loc);
@@ -336,6 +326,7 @@ public class Comm extends RobotPlayer {
                 writeBits(SYM_BIT + sym, 1, 1);
             }
         }
+        needSymmetryReport = false;
     }
 
     public static void guessSym() {
@@ -346,7 +337,11 @@ public class Comm extends RobotPlayer {
                 symmetry = sym;
             }
         }
-        assert numPossible > 0;
+        if (numPossible == 0) {
+            System.out.println("impossible that no sym is correct, guess rotation");
+            symmetry = 0;
+            numPossible = 1;
+        }
         if (numPossible == 1) {
             isSymmetryConfirmed = true;
         } else {
@@ -362,41 +357,29 @@ public class Comm extends RobotPlayer {
     }
 
     // helper funcs
-    private static int read_Segment_of_bits(int left, int right, int rv){
-        int X = buffered_share_array[left/16];
-        int x = 16 - left%16, y = 15 - right%16;
-        int length = right - left + 1;
-        return (rv << length) + ((X%(1<<x))>>y);
-    }
-
-    private static int readBits(int startingBitIndex, int length) {
-        int endingBitIndex = startingBitIndex + length - 1;
+    private static int readBits(int left, int length) {
+        int endingBitIndex = left + length - 1;
         int rv = 0;
-        int current = startingBitIndex;
-        while (current <= endingBitIndex){
-            int left = current;
-            int right = Math.min(left/16*16+15, endingBitIndex);
-            rv = read_Segment_of_bits (left, right, rv);
-            current = right + 1;
+        while (left <= endingBitIndex) {
+            int right = Math.min(left | 0xF, endingBitIndex);
+            rv = (rv << (right - left + 1)) + ((buffered_share_array[left/16] % (1 << (16 - left%16))) >> (15 - right % 16));
+            left = right + 1;
         }
         return rv;
     }
 
     private static void writeBits(int startingBitIndex, int length, int value) {
         assert value < (1 << length);
-        int current_ending = startingBitIndex + length - 1;
         int current_length = length;
-        int current_value = value;
         while (current_length > 0){
-            current_ending = startingBitIndex + current_length - 1;
+            int current_ending = startingBitIndex + current_length - 1;
             int len = Math.min(current_ending%16+1, current_length);
             int left = current_ending - len + 1;
-            int original_value = read_Segment_of_bits (left, current_ending, 0);
-            int new_value = current_value % (1 << len);
-            current_value >>= len;
+            int original_value = (buffered_share_array[left/16] % (1 << (16 - left%16))) >> (15 - current_ending % 16);
+            int new_value = value % (1 << len);
+            value >>= len;
             if (new_value != original_value){
-                is_array_changed[current_ending / 16] = true;
-                is_array_changed_total = true;
+                changedIndexes.add(current_ending / 16);
                 buffered_share_array[current_ending / 16] ^= (new_value^original_value) << (15 - current_ending % 16);
             }
             current_length -= len;

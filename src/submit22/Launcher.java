@@ -1,7 +1,7 @@
-package bot1;
+package submit22;
 
 import battlecode.common.*;
-import bot1.util.FastIterableRobotInfoSet;
+import submit22.util.FastIterableRobotInfoSet;
 
 public class Launcher extends Unit {
     static class SimpleLauncherInfo {

@@ -1,7 +1,7 @@
-package bot1;
+package launcher_bench;
 
 import battlecode.common.*;
-import bot1.util.FastIterableRobotInfoSet;
+import launcher_bench.util.FastIterableRobotInfoSet;
 
 public class Launcher extends Unit {
     static class SimpleLauncherInfo {
@@ -65,7 +65,7 @@ public class Launcher extends Unit {
     static RobotInfo closestEnemy = null;
     static int ourTeamStrength = 1;
     static int ourTeamHealth = 0;
-    static int closeFriendsSize = 0;
+    static int closeFriendsSize = 0; 
 
     // macro vars
     static RobotInfo closestFriendlyLauncher = null;
@@ -101,8 +101,8 @@ public class Launcher extends Unit {
                     Comm.eliminateSym(Comm.symmetry);
                 }
             }
+            MapRecorder.recordSym(500);
         }
-        MapRecorder.recordSym(500);
     }
 
     static void sense(boolean isSecondTime) throws GameActionException {
@@ -122,14 +122,14 @@ public class Launcher extends Unit {
                 if (robot.type == RobotType.LAUNCHER) {
                     if (friendlyLaunchers.size < 6)
                         friendlyLaunchers.add(robot);
-                    if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4 ||
-                            (checkWall(rc.getLocation(), robot.getLocation())
-                                    && betterDistance(rc.getLocation(), robot.getLocation()) <= 9)){
-                        //                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
-                        //                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
-                        closeFriendsSize+=1;
-                        ourTeamHealth += (int) Math.ceil((double) robot.getHealth() / DAMAGE);
-                    }
+                        if (betterDistance(rc.getLocation(), robot.getLocation()) <= 4 ||
+                                (checkWall(rc.getLocation(), robot.getLocation())
+                                        && betterDistance(rc.getLocation(), robot.getLocation()) <= 9)){
+    //                        System.out.println(String.format("robotid%d,%d,%s,%s", robot.getID(),
+    //                                betterDistance(rc.getLocation(), robot.getLocation()), rc.getLocation(), robot.location));
+                            closeFriendsSize+=1;
+                            ourTeamHealth += (int) Math.ceil((double) robot.getHealth() / DAMAGE);
+                        }
                     ourTeamStrength += 1;
 
                     if (closestFriendlyLauncher == null) {
@@ -219,9 +219,9 @@ public class Launcher extends Unit {
 //            rc.setIndicatorLine(rc.getLocation(), closestFriendlyLauncher.getLocation(), 0 ,0,0);
 //        }
 
-
+//
 //        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 3) && closeFriendsSize < 2
-//                && groupingAttempt < 10) {
+//            && groupingAttempt < 10) {
 //            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
 //                moveToward(closestFriendlyLauncher.location);
 //                groupingAttempt+=1;
@@ -363,7 +363,7 @@ public class Launcher extends Unit {
                 // extraCheck == 2: go to a loc that can still attack
                 if (result == null) result = dir;
                 if ((rc.getLocation().add(result).distanceSquaredTo(loc)
-                        < rc.getLocation().add(dir).distanceSquaredTo(loc))) {
+                                < rc.getLocation().add(dir).distanceSquaredTo(loc))) {
                     result = dir;
                 }
             }

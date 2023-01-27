@@ -300,7 +300,6 @@ public class Unit extends RobotPlayer {
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null)
             return false;
-        // disallow going into enemy HQ attack range when symmetry confirmed
         if (getClosestDis(Comm.enemyHQLocations) > 9 && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
             return false;
         }

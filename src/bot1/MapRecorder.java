@@ -147,4 +147,39 @@ public class MapRecorder extends RobotPlayer {
         spawnableSet.updateIterable();
         Headquarter.spawnableSet = spawnableSet;
     }
+
+//    remnents of defensive launcher strategy
+//    public static MapLocation findBestLoc(MapLocation wellLoc) {
+//        // returns a defensive location around a mine
+//        // all enemy HQ apply an attractive vector
+//        // force proportional to 1/dis
+//        double fx = 0, fy = 0;
+//        double disSq;
+//        for (int i = Comm.numHQ; --i >= 0;) {
+//            disSq = wellLoc.distanceSquaredTo(Comm.enemyHQLocations[i]);
+//            fx += (Comm.enemyHQLocations[i].x - wellLoc.x) / disSq * 10;
+//            fy += (Comm.enemyHQLocations[i].y - wellLoc.y) / disSq * 10;
+//        }
+//        double dis = Math.sqrt(fx * fx + fy * fy);
+//        if (dis <= 1e-6) {
+//            fx = 1;
+//            fy = 0;
+//        } else {
+//            fx = fx / dis;
+//            fy = fy / dis;
+//        }
+//        int x = (int)(wellLoc.x + fx * 6);
+//        int y = (int)(wellLoc.y + fy * 6);
+//        for (int[] dir : Unit.BFS25) {
+//            int tx = x + dir[0];
+//            int ty = y + dir[1];
+//            if ((vals[tx * mapWidth + mapHeight] & SEEN_BIT) == 0
+//                    || ((vals[tx * mapWidth + mapHeight] & PASSIABLE_BIT) != 0 && (vals[tx * mapWidth + mapHeight] & CURRENT_MASK) == 8)) {
+//                x = tx;
+//                y = ty;
+//                break;
+//            }
+//        }
+//        return new MapLocation(x, y);
+//    }
 }

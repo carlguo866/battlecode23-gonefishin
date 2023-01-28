@@ -114,7 +114,8 @@ public class Unit extends RobotPlayer {
                 stuckCnt = 0;
             }
             lastLocation = rc.getLocation();
-            if (stuckCnt >= 2) {
+            // anchoring carriers wait for others to yield, so no stuck cnt
+            if (stuckCnt >= 2 && rc.getNumAnchors(Anchor.STANDARD) == 0) {
                 indicator += "stuck reset";
                 randomMove();
                 pathingCnt = 0;
@@ -313,12 +314,9 @@ public class Unit extends RobotPlayer {
         MapLocation loc = rc.getLocation().add(dir);
         if (!MapRecorder.check(loc, targetDir)) return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
-        if (robot != null)
-            return false;
-        /* 
-        if (getClosestDis(Comm.enemyHQLocations) > 9 && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
-            return false;
-        }*/
+        // anchoring carriers don't yield to other robots
+        if (robot != null && (rc.getNumAnchors(Anchor.STANDARD) == 0 || robot.type == RobotType.HEADQUARTERS))
+                return false;
         return true;
     }
 

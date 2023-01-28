@@ -1,7 +1,9 @@
 package bot1;
 
 import battlecode.common.*;
+import bot1.util.FastIterableIntSet;
 import bot1.util.FastIterableRobotInfoSet;
+import java.util.Random;
 
 public class Launcher extends Unit {
     static class SimpleLauncherInfo {
@@ -43,9 +45,14 @@ public class Launcher extends Unit {
     private static final int MAX_HEALTH = 200;
     private static final int DAMAGE = 20;
     private static final int ATTACK_DIS = 16;
-
     private static final int VISION_DIS = 20;
 
+    private static final int ATTACKING = 1;
+    private static final int HEALING = 2;
+    private static final Random rng = new Random(rc.getID());
+
+    private static int state = ATTACKING;
+    private static MapLocation anchoringCarrier = null;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 
@@ -83,6 +90,7 @@ public class Launcher extends Unit {
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
+        indicator += String.format("s%d,", state);
         sense(false);
         micro(false);
         macro();
@@ -108,6 +116,7 @@ public class Launcher extends Unit {
     }
 
     static void sense(boolean isSecondTime) throws GameActionException {
+        anchoringCarrier = null;
         attackTarget = null;
         closestEnemy = null;
         ourTeamStrength = 1;
@@ -144,6 +153,8 @@ public class Launcher extends Unit {
                         closestFriendlyLauncher = robot;
                     }
                     lastFriendSensedRound = rc.getRoundNum();
+                } else if (robot.type == RobotType.CARRIER && robot.getNumAnchors(Anchor.STANDARD) != 0) {
+                    anchoringCarrier = robot.location;
                 }
             } else {
                 if (robot.type == RobotType.HEADQUARTERS) {
@@ -208,67 +219,76 @@ public class Launcher extends Unit {
     }
 
     static void macro() throws GameActionException{
-        if (!rc.isMovementReady()) {
-            return;
-        }
-        if (getClosestDis(rc.getLocation(), Comm.enemyHQLocations) <= 9) {
-            moveToward(rc.getLocation().add(rc.getLocation().directionTo(Comm.enemyHQLocations[getClosestID(rc.getLocation(), Comm.enemyHQLocations)]).opposite()));
-        }
+        // only macro move in even turns
+        if (!rc.isMovementReady() || rc.getRoundNum() % 2 == 0) return;
         if (Comm.needSymmetryReport && rc.getRoundNum() > 150) {
             moveToward(getClosestLoc(Comm.friendlyHQLocations));
             indicator += "gotsym";
             return;
         }
-        indicator += String.format("size%d", closeFriendsSize);
-//        if (closestFriendlyLauncher != null) {
-//            rc.setIndicatorLine(rc.getLocation(), closestFriendlyLauncher.getLocation(), 0 ,0,0);
-//        }
-
-
-//        if ((attackTarget == null || rc.getRoundNum() - lastEnemySensedRound < 3) && closeFriendsSize < 2
-//                && groupingAttempt < 10) {
-//            if (closestFriendlyLauncher != null && betterDistance(rc.getLocation(), closestFriendlyLauncher.location) >= 9) {
-//                moveToward(closestFriendlyLauncher.location);
-//                groupingAttempt+=1;
-//                return;
-//            } else if (closeFriendsSize == 0 && cachedFriendlyLauncher != null) {
-//                moveToward(cachedFriendlyLauncher.location);
-//                groupingAttempt+=1;
-//                return;
-//            }
-//        }
-
-        // If enemy reported recently that is close
-        MapLocation enemyLocation = Comm.getEnemyLoc();
-        if (enemyLocation != null
-                && rc.getRoundNum() - Comm.getEnemyRound() <= 50
-                && Comm.getEnemyRound() > clearedUntilRound
-                && rc.getLocation().distanceSquaredTo(enemyLocation) <= 64) {
-            if (rc.getLocation().distanceSquaredTo(enemyLocation) <= 4) {
-                // enemy has been cleared
-                clearedUntilRound = rc.getRoundNum();
-            } else {
-                moveToward(enemyLocation);
-                indicator += String.format("M2E@%s", enemyLocation);
-            }
-        } else {
-            if (lastSym != Comm.symmetry) {
-                // recaculate the closest HQ when sym changes
-                lastSym = Comm.symmetry;
-                enemyHQID = getClosestID(Comm.enemyHQLocations);
-            }
-            // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
-            if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
-                for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
-                    if (Comm.enemyHQLocations[i % 4] != null) {
-                        enemyHQID = i % 4;
-                        break;
-                    }
+        tryIslandStuff();
+        if (anchoringCarrier != null) { // try escorting anchoring carrier
+            moveToward(anchoringCarrier);
+            indicator += "escort,";
+        }
+        if (!rc.isMovementReady()) return;
+        if (lastSym != Comm.symmetry) {
+            // recaculate the closest HQ when sym changes
+            lastSym = Comm.symmetry;
+            enemyHQID = getClosestID(Comm.enemyHQLocations);
+        }
+        // avoid the enemy HQ radius
+        MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+        if (rc.getLocation().distanceSquaredTo(closestEnemyHQ) <= 9) {
+            tryMoveDir(rc.getLocation().directionTo(closestEnemyHQ).opposite());
+        }
+        // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
+        if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
+            for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
+                if (Comm.enemyHQLocations[i % 4] != null) {
+                    enemyHQID = i % 4;
+                    break;
                 }
             }
-            enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
-            indicator += String.format("M2EHQ@%s", enemyHQLoc);
-            moveToward(enemyHQLoc);
+        }
+        enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
+        moveToward(enemyHQLoc);
+    }
+
+    private static int lastFailedHealingTurn = -1000;
+    static void tryIslandStuff() throws GameActionException {
+        // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
+        boolean needHeal = rc.getRoundNum() - lastFailedHealingTurn > 100 &&
+                ((rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < 100);
+        if (!needHeal) {
+            state = ATTACKING;
+        }
+        int friendlyIslandIndex = needHeal? Comm.getClosestFriendlyIslandIndex() : 0; // only calc if need heal
+        int[] islandIndexes = rc.senseNearbyIslands();
+        for (int i = islandIndexes.length; --i >=0; ) {
+            int islandIndex = islandIndexes[i];
+            Team occupyingTeam = rc.senseTeamOccupyingIsland(islandIndex);
+            if (needHeal && islandIndex == friendlyIslandIndex) {
+                if (occupyingTeam != myTeam) {
+                    lastFailedHealingTurn = rc.getRoundNum();
+                    state = ATTACKING;
+                    System.out.printf("failed healing on island %d\n", friendlyIslandIndex);
+                } else {
+                    state = HEALING;
+                    MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
+                    moveToward(locs[rng.nextInt(locs.length)]);
+                    return;
+                }
+            }
+            if (occupyingTeam == oppTeam || (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
+                MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
+                moveToward(locs[rng.nextInt(locs.length)]);
+                return;
+            }
+        }
+        if (rc.isMovementReady() && friendlyIslandIndex != 0) {
+            indicator += "goheal,";
+            moveToward(Comm.getIslandLocation(friendlyIslandIndex));
         }
     }
 
@@ -332,19 +352,6 @@ public class Launcher extends Unit {
                     && rc.isActionReady()
                     && rc.canAttack(cachedAttackTarget.loc)) {
                 rc.attack(cachedAttackTarget.loc);
-            }
-
-            int[] islands = rc.senseNearbyIslands();
-            if (isSecondTime && islands.length != 0) {
-                for (int island: islands){
-                    if ( (rc.senseTeamOccupyingIsland(island) == oppTeam)){
-                        MapLocation[] islandLoc = rc.senseNearbyIslandLocations(island);
-                        if (islandLoc.length != 0 &&
-                                rc.isActionReady() && rc.canAttack(islandLoc[0])) {
-                            rc.attack(islandLoc[0]);
-                        }
-                    }
-                }
             }
 
             MapLocation[] clouds = rc.senseNearbyCloudLocations();

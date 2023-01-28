@@ -51,9 +51,9 @@ public strictfp class RobotPlayer {
                     case HEADQUARTERS: Headquarter.run();  break;
                     case CARRIER: Carrier.run();  break;
                     case LAUNCHER: Launcher.run(); break;
-                    case BOOSTER: // Examplefuncsplayer doesn't use any of these robot types below.
-                    case DESTABILIZER: // You might want to give them a try!
-                    case AMPLIFIER:       break;
+                    case AMPLIFIER:
+                    case BOOSTER:
+                    case DESTABILIZER:  break;
                 }
                 rc.setIndicatorString(indicator);
             } catch (GameActionException e) {
@@ -73,7 +73,7 @@ public strictfp class RobotPlayer {
                 // Signify we've done everything we want to do, thereby ending our turn.
                 // This will make our code wait until the next turn, and then perform this loop again.
                 turnCount += 1;
-                if (startRound != rc.getRoundNum() && rc.getType() != RobotType.LAUNCHER) {
+                if (startRound != rc.getRoundNum()) {
                     System.out.printf("overran turn from %d to %d\n", startRound, rc.getRoundNum());
                 }
                 Clock.yield();

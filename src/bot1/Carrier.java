@@ -1,6 +1,7 @@
 package bot1;
 
 import battlecode.common.*;
+import bot1.util.FastIterableIntSet;
 import bot1.util.FastIterableLocSet;
 import bot1.util.FastLocIntMap;
 
@@ -171,13 +172,16 @@ public class Carrier extends Unit {
 
     private static MapLocation targetLoc;
     private static int targetIslandIndex = -1;
+    private static FastIterableIntSet ignoredIslands = new FastIterableIntSet(GameConstants.MAX_NUMBER_ISLANDS);
     private static void anchor() throws GameActionException {
+        indicator += String.format("anchor %d@%s,", targetIslandIndex, targetLoc);
         int currentIslandIndex = rc.senseIsland(rc.getLocation());
         if (currentIslandIndex != -1 && rc.senseTeamOccupyingIsland(currentIslandIndex) == Team.NEUTRAL) {
             if (rc.canPlaceAnchor()) {
                 rc.placeAnchor();
                 // on island so must can report
                 Comm.reportIsland(rc.getLocation(), currentIslandIndex, Comm.ISLAND_FRIENDLY);
+                Comm.commit_write();
                 resumeWork();
             }
         }
@@ -189,6 +193,9 @@ public class Carrier extends Unit {
             if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
                 if (island == targetIslandIndex) {
                     // the original target is not placable anymore
+                    if (Comm.getIslandStatus(island) == Comm.ISLAND_NEUTRAL) {
+                        ignoredIslands.add(island);
+                    }
                     targetIslandIndex = -1;
                     targetLoc = null;
                 }
@@ -207,6 +214,9 @@ public class Carrier extends Unit {
         // otherwise try to find target from Comm
         if (targetLoc == null) {
             for (int i = 1; i <= islandCount; i++) {
+                if (ignoredIslands.contains(i)) {
+                    continue;
+                }
                 MapLocation islandLocation = Comm.getIslandLocation(i);
                 if (islandLocation != null && Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL) {
                     int islandDis = islandLocation.distanceSquaredTo(rc.getLocation());

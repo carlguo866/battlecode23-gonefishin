@@ -88,7 +88,7 @@ public class Unit extends RobotPlayer {
 
     // new path finding code from Ray
     private static final int PRV_LENGTH = 60;
-    private static final int TURNS_BEFORE_SWITCH = 15;
+    private static final int TURNS_BEFORE_SWITCH = 20;
     private static Direction[] prv = new Direction[PRV_LENGTH];
     private static int pathingCnt = 0;
     private static MapLocation lastPathingTarget = null;
@@ -99,6 +99,10 @@ public class Unit extends RobotPlayer {
     private static int currentTurnLen = 0;
     private static int currentMaxTurnLen = TURNS_BEFORE_SWITCH;
     private static int lastmovecount = 0;
+    private static Direction[] prv_ = new Direction[PRV_LENGTH];
+    private static int pathingCnt_ = 0;
+    static int MAX_DEPTH = 15;
+
     static void moveToward(MapLocation location) throws GameActionException {
         // reset queue when target location changes or there's gap in between calls
         if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 2) {
@@ -114,8 +118,7 @@ public class Unit extends RobotPlayer {
                 stuckCnt = 0;
             }
             lastLocation = rc.getLocation();
-            // anchoring carriers wait for others to yield, so no stuck cnt
-            if (stuckCnt >= 2 && rc.getNumAnchors(Anchor.STANDARD) == 0) {
+            if (stuckCnt >= 3) {
                 indicator += "stuck reset";
                 randomMove();
                 pathingCnt = 0;
@@ -136,12 +139,26 @@ public class Unit extends RobotPlayer {
                 } while (false);
             }
 
+            if (currentTurnLen >= currentMaxTurnLen) {
+                currentTurnLen = 0;
+                pathingCnt = 0;
+                currentTurnDir = (currentTurnDir + 1) % 2;
+                currentMaxTurnLen = currentMaxTurnLen * 3;
+                lastmovecount = 0;
+            }
+
             if (pathingCnt == 0) {
-                Direction dir = rc.getLocation().directionTo(location);
-                if (canPass(dir)) {
+                currentTurnLen = 0;
+                if (currentMaxTurnLen > TURNS_BEFORE_SWITCH && lastmovecount > currentMaxTurnLen / 3) {
+                    currentMaxTurnLen = TURNS_BEFORE_SWITCH;
                     currentTurnDir = 0;
+                    lastmovecount = 0;
+                }
+                Direction dir = rc.getLocation().directionTo(location);
+                if (canPass(dir) || canPass(dir.rotateRight(), dir) || canPass(dir.rotateLeft(), dir)) {
                     tryMoveDir(dir);
                 } else {
+                    //rng = new Random(rc.getID());
                     currentTurnDir = getTurnDir(dir, location);
                     while (!canPass(dir) && pathingCnt != 8) {
                         prv[pathingCnt] = dir;
@@ -216,9 +233,7 @@ public class Unit extends RobotPlayer {
         else return ydif;
     }
 
-    private static Direction[] prv_ = new Direction[PRV_LENGTH];
-    private static int pathingCnt_ = 0;
-    static int MAX_DEPTH = 16;
+    
     static int getTurnDir(Direction dir, MapLocation target) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;

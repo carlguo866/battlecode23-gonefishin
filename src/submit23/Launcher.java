@@ -1,8 +1,7 @@
-package bot1;
+package submit23;
 
 import battlecode.common.*;
 
-import java.util.Map;
 import java.util.Random;
 
 public class Launcher extends Unit {

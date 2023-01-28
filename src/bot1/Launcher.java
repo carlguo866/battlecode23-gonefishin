@@ -211,6 +211,9 @@ public class Launcher extends Unit {
         if (!rc.isMovementReady()) {
             return;
         }
+        if (getClosestDis(rc.getLocation(), Comm.enemyHQLocations) <= 9) {
+            moveToward(rc.getLocation().add(rc.getLocation().directionTo(Comm.enemyHQLocations[getClosestID(rc.getLocation(), Comm.enemyHQLocations)]).opposite()));
+        }
         if (Comm.needSymmetryReport && rc.getRoundNum() > 150) {
             moveToward(getClosestLoc(Comm.friendlyHQLocations));
             indicator += "gotsym";

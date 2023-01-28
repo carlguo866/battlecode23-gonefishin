@@ -297,11 +297,11 @@ public class Unit extends RobotPlayer {
 
     static boolean canPass(MapLocation loc, Direction targetDir) throws GameActionException {
         if (!MapRecorder.check(loc, targetDir)) return false;
-        
+        /*
         if (getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
             return false;
         }
-        
+        */
         if (!rc.canSenseLocation(loc)) return true;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null)
@@ -315,9 +315,10 @@ public class Unit extends RobotPlayer {
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null)
             return false;
+        /* 
         if (getClosestDis(Comm.enemyHQLocations) > 9 && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
             return false;
-        }
+        }*/
         return true;
     }
 

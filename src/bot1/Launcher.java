@@ -28,11 +28,13 @@ public class Launcher extends Unit {
     static RobotInfo backupTarget = null;
     static RobotInfo chaseTarget = null;
 
-    private static final int MAX_ENEMY_CNT = 10;
+    private static final int MAX_ENEMY_CNT = 8;
     static RobotInfo[] enemyLaunchers = new RobotInfo[MAX_ENEMY_CNT];
+    static boolean[] enemyInCloud = new boolean[MAX_ENEMY_CNT];
     static int enemyLauncherCnt;
-    private static final int MAX_FRIENDLY_CNT = 8;
+    private static final int MAX_FRIENDLY_CNT = 6;
     static RobotInfo[] friendlyLaunchers = new RobotInfo[MAX_FRIENDLY_CNT];
+    static boolean[] friendInCloud = new boolean[MAX_ENEMY_CNT];
     static int friendlyLauncherCnt;
 
     static RobotInfo closestEnemy = null;
@@ -104,6 +106,7 @@ public class Launcher extends Unit {
                             && (robot.location.distanceSquaredTo(rc.getLocation()) < groupingTarget.location.distanceSquaredTo(rc.getLocation()))))) {
                         groupingTarget = robot;
                     }
+                    friendInCloud[friendlyLauncherCnt] = rc.senseCloud(robot.location);
                     friendlyLaunchers[friendlyLauncherCnt++] = robot;
                     ourTeamStrength += 1;
                 } else if (robot.type == RobotType.CARRIER && robot.getNumAnchors(Anchor.STANDARD) != 0) {
@@ -118,17 +121,18 @@ public class Launcher extends Unit {
                     MapRecorder.reportEnemyHQ(robot.location); // this is fairly optimized and unexpensive
                     continue;
                 } else if (robot.type == RobotType.LAUNCHER || robot.type == RobotType.DESTABILIZER) {
+                    if (closestEnemy == null || rc.getLocation().distanceSquaredTo(closestEnemy.location) >
+                            rc.getLocation().distanceSquaredTo(robot.location)) {
+                        closestEnemy = robot;
+                    }
                     if (enemyLauncherCnt >= MAX_ENEMY_CNT) {
                         continue;
                     }
+                    enemyInCloud[enemyLauncherCnt] = rc.senseCloud(robot.location);
                     enemyLaunchers[enemyLauncherCnt++] = robot;
                     ourTeamStrength -= 1;
                     if (robot.location.distanceSquaredTo(rc.getLocation()) > ATTACK_DIS) {
                         chaseTarget = robot;
-                    }
-                    if (closestEnemy == null || rc.getLocation().distanceSquaredTo(closestEnemy.location) >
-                            rc.getLocation().distanceSquaredTo(robot.location)) {
-                        closestEnemy = robot;
                     }
                 } else {
                     int dis = rc.getLocation().distanceSquaredTo(robot.location);
@@ -301,8 +305,10 @@ public class Launcher extends Unit {
         for (Direction dir : dirs) {
             if (rc.canMove(dir)) {
                 int canSee = 0;
+                boolean hasCloud = rc.senseCloud(rc.getLocation().add(dir));
                 for (int i = enemyLauncherCnt; --i >= 0;){
-                    if (rc.getLocation().add(dir).distanceSquaredTo(enemyLaunchers[i].location) <= VISION_DIS) {
+                    int newDis = rc.getLocation().add(dir).distanceSquaredTo(enemyLaunchers[i].location);
+                    if (newDis <= 4 || (newDis <= VISION_DIS && !hasCloud && !enemyInCloud[i])) {
                         canSee++;
                     }
                 }
@@ -395,7 +401,8 @@ public class Launcher extends Unit {
             }
             int canAttackFriendCnt = 1;
             for (int friend_i = friendlyLauncherCnt; --friend_i >= 0;) {
-                if (friendlyLaunchers[friend_i].location.distanceSquaredTo(enemy.location) <= ATTACK_DIS) {
+                int friendEnemyDis = friendlyLaunchers[friend_i].location.distanceSquaredTo(enemy.location);
+                if (friendEnemyDis <= 4 || (friendEnemyDis <= ATTACK_DIS && !enemyInCloud[enemy_i] && !friendInCloud[friend_i])) {
                     canAttackFriendCnt++;
                 }
             }

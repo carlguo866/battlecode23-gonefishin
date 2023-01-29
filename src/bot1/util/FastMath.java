@@ -20,9 +20,6 @@ public class FastMath {
     // while Random.nextInt(256) is ~50 bytecodes and (int)(256*Math.random()) is ~75 bytecodes
     // Could also make other versions with a smaller upper limit
     public static int rand256() {
-        if (randIndex == 9900) {
-            randIndex = 0;
-        }
         randIndex = (randIndex + 1) % lookupRand256Length;
         return lookupRand256.charAt(randIndex);
     }

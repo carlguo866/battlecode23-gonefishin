@@ -72,7 +72,20 @@ public class Headquarter extends Unit {
     }
 
     private static void tryBuildAnchor() throws GameActionException {
-        if ((((rc.getRobotCount() - carrierCnt) / Comm.numHQ > 20 && carrierCnt / Comm.numHQ > 10) || (rc.getRoundNum() > 1200 && rc.getRobotCount() / Comm.numHQ > 12))
+        boolean shouldBuild = false;
+        if ((rc.getRobotCount() - carrierCnt) / Comm.numHQ > 18 && carrierCnt / Comm.numHQ > 10)
+            shouldBuild = true;
+
+        // late game
+        if ((rc.getRoundNum() > 1200 && rc.getRobotCount() / Comm.numHQ > 12))
+            shouldBuild = true;
+
+        // allow for a single early anchor for healing
+        if (Comm.getClosestFriendlyIslandIndex() == 0 && rc.getRoundNum() > 180
+                && hqid == 0 && rc.getRobotCount() / Comm.numHQ > 18)
+            shouldBuild = true;
+
+        if (shouldBuild
                 && rc.getNumAnchors(Anchor.STANDARD) == 0
                 && rc.getRoundNum() - lastRoundAnchorBuilt > 100) {
             usableAD -= Constants.ANCHOR_COST_AD;
@@ -134,7 +147,7 @@ public class Headquarter extends Unit {
                 || (spawnableTileOccupied > spawnableSet.size / 2 && spawnableTileOccupied > 5)
                 || friendlyCount > 30
                 || spawnableTileOccupied > 12
-                || carrierCnt / Comm.numHQ > 30
+                || carrierCnt / Comm.numHQ > 25
                 || rc.getRobotCount() / Comm.numHQ > 80)
                 && rc.getRoundNum() > 100
                 && rc.getRobotCount() / Comm.numHQ > 30) {

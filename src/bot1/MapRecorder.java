@@ -120,7 +120,7 @@ public class MapRecorder extends RobotPlayer {
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {
             if (infos[i].isPassable()) {
-                vals[infos[i].getMapLocation().x * mapHeight + infos[i].getMapLocation().y] = PASSIABLE_BIT;
+                vals[infos[i].getMapLocation().x * mapHeight + infos[i].getMapLocation().y] = (char) (PASSIABLE_BIT | infos[i].getCurrentDirection().ordinal());
                 Headquarter.sensablePassibleArea++;
             }
         }
@@ -132,7 +132,9 @@ public class MapRecorder extends RobotPlayer {
         for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
             int x = hqX + HQ_SPAWNABLE_DX[i];
             int y = hqY + HQ_SPAWNABLE_DY[i];
-            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x * mapHeight + y] & PASSIABLE_BIT) == 0)
+            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight
+                    || (vals[x * mapHeight + y] & PASSIABLE_BIT) == 0
+                    || (vals[x * mapHeight + y] & CURRENT_MASK) != 8)
                 continue;
             if (spawnableSet.contains(x + 1, y)) {spawnableSet.add(x, y); continue;}
             if (spawnableSet.contains(x + 1, y + 1)) {spawnableSet.add(x, y); continue;}
@@ -142,6 +144,16 @@ public class MapRecorder extends RobotPlayer {
             if (spawnableSet.contains(x - 1, y)) {spawnableSet.add(x, y); continue;}
             if (spawnableSet.contains(x - 1, y + 1)) {spawnableSet.add(x, y); continue;}
             if (spawnableSet.contains(x - 1, y - 1)) {spawnableSet.add(x, y);}
+        }
+        if (spawnableSet.size < 3) {
+            System.out.println("weird map, allowing all spawns");
+            for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
+                int x = hqX + HQ_SPAWNABLE_DX[i];
+                int y = hqY + HQ_SPAWNABLE_DY[i];
+                if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
+                    spawnableSet.add(x, y);
+                }
+            }
         }
         spawnableSet.remove(hqX, hqY);
         spawnableSet.updateIterable();

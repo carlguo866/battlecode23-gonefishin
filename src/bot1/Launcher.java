@@ -37,7 +37,6 @@ public class Launcher extends Unit {
     static boolean[] friendInCloud = new boolean[MAX_ENEMY_CNT];
     static int friendlyLauncherCnt;
 
-    static RobotInfo closestEnemy = null;
     static RobotInfo groupingTarget = null;
     static int lastLauncherAttackRound = 0;
     static int ourTeamStrength = 1;
@@ -84,7 +83,6 @@ public class Launcher extends Unit {
     static void sense() throws GameActionException {
         anchoringCarrier = null;
         attackTarget = null;
-        closestEnemy = null;
         chaseTarget = null;
         groupingTarget = null;
         backupTarget = null;
@@ -121,10 +119,6 @@ public class Launcher extends Unit {
                     MapRecorder.reportEnemyHQ(robot.location); // this is fairly optimized and unexpensive
                     continue;
                 } else if (robot.type == RobotType.LAUNCHER || robot.type == RobotType.DESTABILIZER) {
-                    if (closestEnemy == null || rc.getLocation().distanceSquaredTo(closestEnemy.location) >
-                            rc.getLocation().distanceSquaredTo(robot.location)) {
-                        closestEnemy = robot;
-                    }
                     if (enemyLauncherCnt >= MAX_ENEMY_CNT) {
                         continue;
                     }
@@ -237,22 +231,36 @@ public class Launcher extends Unit {
 //                chaseTarget == null? "" : chaseTarget.location,
 //                cachedEnemyLocation == null? "" : cachedEnemyLocation,
 //                rc.isMovementReady());
-        indicator += String.format("gt%s", groupingTarget == null? null : groupingTarget.location);
-        if (attackTarget != null) {
-            lastLauncherAttackRound = rc.getRoundNum();
-            if (rc.canAttack(attackTarget.location)) {
-                cachedEnemyLocation = attackTarget.location;
-                cachedRound = rc.getRoundNum();
-                rc.attack(attackTarget.location);
+        RobotInfo target = attackTarget == null? backupTarget : attackTarget;
+        if (target != null) {
+            if (target == attackTarget) {
+                lastLauncherAttackRound = rc.getRoundNum();
             }
-            kite(closestEnemy.location);
-        } else if (backupTarget != null) {
-            if (rc.canAttack(backupTarget.location)) {
+            RobotInfo deadTarget = null;
+            if (rc.canAttack(target.location)) {
+                cachedRound = rc.getRoundNum();
+                if (target.health <= DAMAGE) {
+                    deadTarget = target;
+                }
+                rc.attack(target.location);
+            }
+            // find the closest guy alive, focus on launchers first, cache him and kite back
+            int minDis = Integer.MAX_VALUE;
+            cachedEnemyLocation = null;
+            for (int i = enemyLauncherCnt; --i >= 0;) {
+                RobotInfo enemy = enemyLaunchers[i];
+                int dis = enemy.location.distanceSquaredTo(rc.getLocation());
+                if (enemy != deadTarget && dis < minDis) {
+                    cachedEnemyLocation = enemy.location;
+                    minDis = dis;
+                }
+            }
+            if (cachedEnemyLocation == null && backupTarget != null && backupTarget != deadTarget) {
                 cachedEnemyLocation = backupTarget.location;
-                cachedRound = rc.getRoundNum();
-                rc.attack(backupTarget.location);
             }
-            kite(backupTarget.location);
+            if (cachedEnemyLocation != null && rc.isMovementReady()) {
+                kite(cachedEnemyLocation);
+            }
         }
         if (rc.isMovementReady() && rc.isActionReady()) {
             if (chaseTarget != null) {
@@ -343,12 +351,35 @@ public class Launcher extends Unit {
     private static final int[] GUESS_ATTACK_DY = {0, -2, -1, 0, 1, 2, -3, -2, -1, 1, 2, 3, -3, -2, 2, 3, -4, -3, 3, 4, -3, -2, 2, 3, -3, -2, -1, 1, 2, 3, -2, -1, 0, 1, 2, 0};
     private static void tryGuessAttack() throws GameActionException {
         // costs 800 bytecode
+        // first try to attack cached target and its adjacent squares
         if (cachedEnemyLocation != null
-                && rc.getRoundNum() - cachedRound <= 5
-                && rc.getLocation().distanceSquaredTo(cachedEnemyLocation) > 4
-                && rc.canAttack(cachedEnemyLocation)) {
-            rc.attack(cachedEnemyLocation);
-            return;
+                && rc.getRoundNum() - cachedRound <= 8) {
+            Direction targetDir = rc.getLocation().directionTo(cachedEnemyLocation);
+            for (int i = 9; --i >= 0;) {
+                MapLocation loc = null;
+                switch (i) {
+                    case 8: loc = cachedEnemyLocation; break;
+                    case 7: loc = cachedEnemyLocation.add(targetDir); break;
+                    case 6: loc = cachedEnemyLocation.add(targetDir.opposite()); break;
+                    case 5: loc = cachedEnemyLocation.add(targetDir.rotateLeft()); break;
+                    case 4: loc = cachedEnemyLocation.add(targetDir.rotateRight()); break;
+                    case 3: loc = cachedEnemyLocation.add(targetDir.opposite().rotateRight()); break;
+                    case 2: loc = cachedEnemyLocation.add(targetDir.opposite().rotateLeft()); break;
+                    case 1: loc = cachedEnemyLocation.add(targetDir.rotateRight().rotateRight()); break;
+                    case 0: loc = cachedEnemyLocation.add(targetDir.rotateLeft().rotateLeft()); break;
+                }
+                if (!rc.canSenseLocation(loc) && rc.canAttack(loc)) {
+                    char val = MapRecorder.vals[loc.x * mapHeight + loc.y];
+                    if ((val & MapRecorder.SEEN_BIT) != 0
+                            && (val & MapRecorder.PASSIABLE_BIT) == 0
+                            && val != MapRecorder.WITHIN_HQ_RANGE) {
+                        continue; // ignore recorded walls
+                    }
+                    indicator += String.format("guesscache%s,", loc);
+                    rc.attack(loc);
+                    return;
+                }
+            }
         }
 
         MapLocation guessTarget = null;
@@ -368,12 +399,13 @@ public class Launcher extends Unit {
                     continue; // ignore recorded walls
                 }
                 int dis = loc.distanceSquaredTo(closestEnemyHQ);
-                if (dis < disToTarget) {
+                if (dis != 0 && dis < disToTarget) {
                     guessTarget = loc;
                     disToTarget = dis;
                 }
             }
             if (guessTarget != null && rc.canAttack(guessTarget)) {
+                indicator += String.format("guess%s,", guessTarget);
                 rc.attack(guessTarget);
                 return;
             }
@@ -387,12 +419,13 @@ public class Launcher extends Unit {
                 int j = FastMath.rand256() % clouds.length;
                 MapLocation loc = clouds[j];
                 int dis = closestEnemyHQ.distanceSquaredTo(loc);
-                if (dis < disToTarget) {
+                if (dis != 0 && dis < disToTarget) {
                     disToTarget = dis;
                     guessTarget = loc;
                 }
             }
             if (guessTarget != null && rc.canAttack(guessTarget)) {
+                indicator += String.format("guess%s,", guessTarget);
                 rc.attack(guessTarget);
             }
         }

@@ -234,12 +234,13 @@ public class Unit extends RobotPlayer {
     }
 
     
-    static int getTurnDir(Direction dir, MapLocation target) throws GameActionException{
+    static int getTurnDir(Direction direction, MapLocation target) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;
         int moveRight = 0;
         
         pathingCnt_ = 0;
+        Direction dir = direction;
         while (!canPass(now.add(dir), dir) && pathingCnt_ != 8) {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
@@ -274,6 +275,7 @@ public class Unit extends RobotPlayer {
         MapLocation leftend = now;
         pathingCnt_ = 0;
         now = rc.getLocation();
+        dir = direction;
         while (!canPass(dir) && pathingCnt_ != 8) {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
@@ -306,6 +308,8 @@ public class Unit extends RobotPlayer {
             now = now.add(moveDir);
         }
         MapLocation rightend = now;
+        //System.out.println(moveLeft);
+        //System.out.println(moveRight);
         if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return 0;
         if (moveLeft + getSteps(leftend, target) <= moveRight + getSteps(rightend, target)) return 0;
         else return 1;

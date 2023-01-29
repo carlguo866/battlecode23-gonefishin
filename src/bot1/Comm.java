@@ -266,7 +266,13 @@ public class Comm extends RobotPlayer {
     }
 
     // returns the index, or 0 if not found
+    private static int islandCache = 0;
+    private static int islandCacheRound = 100;
     public static int getClosestFriendlyIslandIndex() {
+        // with 35 islands this takes 3500 bytecode... implement caching
+        if (rc.getRoundNum() - islandCacheRound < 20) {
+            return islandCache;
+        }
         int rv = 0;
         MapLocation curLoc = rc.getLocation();
         int dis = Integer.MAX_VALUE;
@@ -280,6 +286,8 @@ public class Comm extends RobotPlayer {
                 }
             }
         }
+        islandCache = rv;
+        islandCacheRound = rc.getRoundNum();
         return rv;
     }
 

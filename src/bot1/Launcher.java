@@ -15,6 +15,7 @@ public class Launcher extends Unit {
 
     private static final int ATTACKING = 1;
     private static final int HEALING = 2;
+    private static final int FIGHTING_ISLAND = 3;
 
     // macro vars
     static int lastSym;
@@ -156,7 +157,7 @@ public class Launcher extends Unit {
         if (tryIslandStuff())
             return;
         if (anchoringCarrier != null) { // try escorting anchoring carrier
-            moveToward(anchoringCarrier);
+            follow(anchoringCarrier);
             indicator += "escort,";
             return;
         }
@@ -186,39 +187,55 @@ public class Launcher extends Unit {
 
     private static int lastFailedHealingTurn = -1000;
     // returns whether has moved
+    private static MapLocation islandTargetLoc = null;
+    private static int islandTargetIndex = 0;
     static boolean tryIslandStuff() throws GameActionException {
         // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
-        boolean needHeal = rc.getRoundNum() - lastFailedHealingTurn > 100 &&
-                ((rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < 100);
-        if (!needHeal) {
+        boolean needHeal =  (rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < 100;
+        if (state == HEALING && !needHeal) {
+            islandTargetIndex = 0;
+            islandTargetLoc = null;
             state = ATTACKING;
         }
-        int friendlyIslandIndex = needHeal? Comm.getClosestFriendlyIslandIndex() : 0; // only calc if need heal
+        if (state == ATTACKING && needHeal && rc.getRoundNum() - lastFailedHealingTurn > 100) {
+            islandTargetIndex = Comm.getClosestFriendlyIslandIndex();
+            if (islandTargetIndex != 0) {
+                islandTargetLoc = Comm.getIslandLocation(islandTargetIndex);
+                state = HEALING;
+            }
+        }
         int[] islandIndexes = rc.senseNearbyIslands();
         for (int i = islandIndexes.length; --i >=0; ) {
             int islandIndex = islandIndexes[i];
             Team occupyingTeam = rc.senseTeamOccupyingIsland(islandIndex);
-            if (needHeal && islandIndex == friendlyIslandIndex) {
-                if (occupyingTeam != myTeam) {
+            if (islandIndex == islandTargetIndex) {
+                // see if we need to transition out of current state
+                if (state == HEALING && occupyingTeam != myTeam) {
                     lastFailedHealingTurn = rc.getRoundNum();
+                    islandTargetLoc = null;
+                    islandTargetIndex = 0;
                     state = ATTACKING;
-                    System.out.printf("failed healing on island %d\n", friendlyIslandIndex);
-                } else {
-                    state = HEALING;
-                    MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
-                    moveToward(locs[FastMath.rand256() % locs.length]);
-                    return true;
+                    System.out.printf("failed healing on island %d\n", islandIndex);
+                }
+                if (state == FIGHTING_ISLAND && (occupyingTeam == Team.NEUTRAL ||
+                        (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth == Anchor.STANDARD.totalHealth))) {
+                    islandTargetLoc = null;
+                    islandTargetIndex = 0;
+                    state = ATTACKING;
                 }
             }
-            if (occupyingTeam == oppTeam || (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
+            if (occupyingTeam == oppTeam ||
+                    (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
-                moveToward(locs[FastMath.rand256() % locs.length]);
-                return true;
+                islandTargetLoc = locs[rc.getID() % locs.length];
+                islandTargetIndex = islandIndex;
+                state = FIGHTING_ISLAND;
+                break;
             }
         }
-        if (rc.isMovementReady() && friendlyIslandIndex != 0) {
-            indicator += "goheal,";
-            moveToward(Comm.getIslandLocation(friendlyIslandIndex));
+        if (rc.isMovementReady() && islandTargetLoc != null) {
+            indicator += "goisland,";
+            moveToward(islandTargetLoc);
             return true;
         }
         return false;
@@ -262,6 +279,10 @@ public class Launcher extends Unit {
                 kite(cachedEnemyLocation);
             }
         }
+        if (Comm.getClosestFriendlyIslandIndex() != 0 && rc.getHealth() < 100) {
+            // go back to heal if possible, no chasing
+            return;
+        }
         if (rc.isMovementReady() && rc.isActionReady()) {
             if (chaseTarget != null) {
                 cachedEnemyLocation = chaseTarget.location;
@@ -280,7 +301,7 @@ public class Launcher extends Unit {
                 && groupingTarget != null
                 && !rc.getLocation().isAdjacentTo(groupingTarget.location)) {
             indicator += "group,";
-            moveToward(groupingTarget.location);
+            follow(rc.getLocation());
         }
     }
 

@@ -18,7 +18,6 @@ public class Unit extends RobotPlayer {
             {2, 2}, {2, -2}, {-2, 2}, {-2, -2}
     };
 
-    // TODO path finding
     static void randomMove() throws GameActionException {
         int starting_i = Constants.rng.nextInt(Constants.directions.length);
         for (int i = starting_i; i < starting_i + 8; i++) {
@@ -236,7 +235,7 @@ public class Unit extends RobotPlayer {
     }
 
 
-    private static final int BYTECODE_CUTOFF = 2500;
+    private static final int BYTECODE_CUTOFF = 3000;
     static int getTurnDir(Direction direction, MapLocation target) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;

@@ -248,10 +248,15 @@ public class Launcher extends Unit {
             kite(backupTarget.location);
         }
         if (rc.isMovementReady() && rc.isActionReady()) {
-            if (chaseTarget != null && rc.getHealth() > chaseTarget.health) {
-                chase(chaseTarget.location);
-            }
-            if (cachedEnemyLocation != null && rc.getRoundNum() - cachedRound <= 2) {
+            if (chaseTarget != null) {
+                cachedEnemyLocation = chaseTarget.location;
+                cachedRound = rc.getRoundNum();
+                if (rc.getHealth() > chaseTarget.health || ourTeamStrength > 2 || chaseTarget.type != RobotType.LAUNCHER) {
+                    chase(chaseTarget.location);
+                } else { // we are at disadvantage, pull back
+                    kite(chaseTarget.location);
+                }
+            } else if (cachedEnemyLocation != null && rc.getRoundNum() - cachedRound <= 2) {
                 chase(cachedEnemyLocation);
             }
         }

@@ -253,7 +253,7 @@ public class Unit extends RobotPlayer {
         
         while (pathingCnt_ > 0) {
             moveLeft++;
-            if (moveLeft > MAX_DEPTH) {
+            if (moveLeft > MAX_DEPTH || Clock.getBytecodesLeft() < 3000) {
                 break;
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
@@ -288,7 +288,7 @@ public class Unit extends RobotPlayer {
         
         while (pathingCnt_ > 0) {
             moveRight++;
-            if (moveRight > MAX_DEPTH) {
+            if (moveRight > MAX_DEPTH || Clock.getBytecodesLeft() < 1500) {
                 break;
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {

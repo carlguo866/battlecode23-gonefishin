@@ -68,7 +68,7 @@ public class Comm extends RobotPlayer {
                 if (i >= 6 && i <= 13) {
                     needWellsUpdate = true;
                 }
-                if (i == 3) {
+                if (i == 3 && !isSymmetryConfirmed) {
                     needSymUpdate = true;
                 }
                 buffered_share_array[i] = rc.readSharedArray(i);

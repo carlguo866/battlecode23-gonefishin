@@ -6,21 +6,6 @@ import java.util.Map;
 import java.util.Random;
 
 public class Launcher extends Unit {
-    static int betterDistance(MapLocation start, MapLocation end){
-        return (int) Math.max(Math.pow(Math.abs(start.x-end.x), 2), Math.pow(Math.abs(start.y-end.y), 2));
-    }
-
-    static boolean checkWall(MapLocation start, MapLocation end) throws GameActionException{
-        MapLocation iter = start.add(start.directionTo(end));
-        int hardstop = 0;
-        while (rc.canSenseLocation(iter) && !iter.equals(end) && hardstop < 4){
-            if (!rc.sensePassability(iter)) return true;
-            iter = iter.add(iter.directionTo(end));
-            hardstop++;
-        }
-        return false;
-    }
-
     static boolean isDiagonal(Direction dir) {
         return dir.dx * dir.dy != 0;
     }
@@ -129,6 +114,7 @@ public class Launcher extends Unit {
                     if (!Comm.isSymmetryConfirmed && getClosestDis(robot.location, Comm.enemyHQLocations) != 0) {
                         Comm.eliminateSym(Comm.symmetry);
                     }
+                    MapRecorder.reportEnemyHQ(robot.location); // this is fairly optimized and unexpensive
                     continue;
                 } else if (robot.type == RobotType.LAUNCHER || robot.type == RobotType.DESTABILIZER) {
                     if (enemyLauncherCnt >= MAX_ENEMY_CNT) {

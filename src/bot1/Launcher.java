@@ -1,9 +1,7 @@
 package bot1;
 
 import battlecode.common.*;
-
-import java.util.Map;
-import java.util.Random;
+import bot1.util.FastMath;
 
 public class Launcher extends Unit {
     static boolean isDiagonal(Direction dir) {
@@ -17,7 +15,6 @@ public class Launcher extends Unit {
 
     private static final int ATTACKING = 1;
     private static final int HEALING = 2;
-    private static final Random rng = new Random(rc.getID());
 
     // macro vars
     static int lastSym;
@@ -50,6 +47,7 @@ public class Launcher extends Unit {
         if (turnCount == 0) {
             // future: get from spawn queue if there are more than one roles
             // prioritize the closest enemy HQ
+            FastMath.initRand(rc);
             lastSym = Comm.symmetry;
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
@@ -60,6 +58,9 @@ public class Launcher extends Unit {
         if (rc.isActionReady()){
             sense();
             micro();
+        }
+        if (rc.isActionReady()) {
+            tryGuessAttack();
         }
         // have launchers perform sym check
         if (Comm.needSymmetryReport && rc.canWriteSharedArray(0, 0)) {
@@ -202,13 +203,13 @@ public class Launcher extends Unit {
                 } else {
                     state = HEALING;
                     MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
-                    moveToward(locs[rng.nextInt(locs.length)]);
+                    moveToward(locs[FastMath.rand256() % locs.length]);
                     return;
                 }
             }
             if (occupyingTeam == oppTeam || (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
-                moveToward(locs[rng.nextInt(locs.length)]);
+                moveToward(locs[FastMath.rand256() % locs.length]);
                 return;
             }
         }
@@ -317,6 +318,65 @@ public class Launcher extends Unit {
         if (bestDir != null){
             indicator += "kite,";
             rc.move(bestDir);
+        }
+    }
+
+    private static final int[] GUESS_ATTACK_DX = {-4, -3, -3, -3, -3, -3, -2, -2, -2, -2, -2, -2, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4};
+    private static final int[] GUESS_ATTACK_DY = {0, -2, -1, 0, 1, 2, -3, -2, -1, 1, 2, 3, -3, -2, 2, 3, -4, -3, 3, 4, -3, -2, 2, 3, -3, -2, -1, 1, 2, 3, -2, -1, 0, 1, 2, 0};
+    private static void tryGuessAttack() throws GameActionException {
+        // costs 800 bytecode
+        if (cachedEnemyLocation != null
+                && rc.getRoundNum() - cachedRound <= 5
+                && rc.getLocation().distanceSquaredTo(cachedEnemyLocation) > 4
+                && rc.canAttack(cachedEnemyLocation)) {
+            rc.attack(cachedEnemyLocation);
+            return;
+        }
+
+        MapLocation guessTarget = null;
+        if (rc.senseCloud(rc.getLocation())) { // I am in a cloud, try attack a tile I can't see
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+            int disToTarget = Integer.MAX_VALUE;
+            int curX = rc.getLocation().x, curY = rc.getLocation().y;
+            for (int i = 10; --i >= 0;) {
+                int j = FastMath.rand256() % GUESS_ATTACK_DX.length;
+                MapLocation loc = new MapLocation(curX + GUESS_ATTACK_DX[j], curY + GUESS_ATTACK_DY[j]);
+                if (!rc.onTheMap(loc))
+                    continue;
+                char val = MapRecorder.vals[loc.x * mapHeight + loc.y];
+                if ((val & MapRecorder.SEEN_BIT) != 0
+                        && (val & MapRecorder.PASSIABLE_BIT) == 0
+                        && val != MapRecorder.WITHIN_HQ_RANGE) {
+                    continue; // ignore recorded walls
+                }
+                int dis = loc.distanceSquaredTo(closestEnemyHQ);
+                if (dis < disToTarget) {
+                    guessTarget = loc;
+                    disToTarget = dis;
+                }
+            }
+            if (guessTarget != null && rc.canAttack(guessTarget)) {
+                rc.attack(guessTarget);
+                return;
+            }
+        }
+
+        MapLocation[] clouds = rc.senseNearbyCloudLocations();
+        if (rc.isActionReady() && clouds.length > 0) {
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+            int disToTarget = Integer.MAX_VALUE;
+            for (int i = 10; --i >= 0;) {
+                int j = FastMath.rand256() % clouds.length;
+                MapLocation loc = clouds[j];
+                int dis = closestEnemyHQ.distanceSquaredTo(loc);
+                if (dis < disToTarget) {
+                    disToTarget = dis;
+                    guessTarget = loc;
+                }
+            }
+            if (guessTarget != null && rc.canAttack(guessTarget)) {
+                rc.attack(guessTarget);
+            }
         }
     }
 

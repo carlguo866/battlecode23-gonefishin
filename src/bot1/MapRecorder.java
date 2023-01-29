@@ -172,6 +172,9 @@ public class MapRecorder extends RobotPlayer {
         Headquarter.spawnableSet = spawnableSet;
     }
 
+    public static final int WITHIN_HQ_RANGE = SEEN_BIT + 7;
+    // this magic number will be treat it as a wall in pathfinder,
+    // but will be considered by Launcher blind attack
     public static void reportEnemyHQ(MapLocation loc) {
         int hqX = loc.x;
         int hqY = loc.y;
@@ -187,7 +190,7 @@ public class MapRecorder extends RobotPlayer {
             if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
                 continue;
             }
-            vals[x * mapHeight + y] = SEEN_BIT; // essentially treat it as a wall
+            vals[x * mapHeight + y] = WITHIN_HQ_RANGE;
         }
         vals[hqX * mapHeight + hqY] = SEEN_BIT;
     }

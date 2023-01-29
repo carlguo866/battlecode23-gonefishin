@@ -245,7 +245,7 @@ public class Unit extends RobotPlayer {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateLeft();
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
         }
@@ -262,11 +262,11 @@ public class Unit extends RobotPlayer {
             while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
                 pathingCnt_++;
-                if (pathingCnt_ > MAX_DEPTH) {
+                if (pathingCnt_ > 8) {
                     break;
                 }
             }
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateLeft();
@@ -280,7 +280,7 @@ public class Unit extends RobotPlayer {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateRight();
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
         }
@@ -297,11 +297,11 @@ public class Unit extends RobotPlayer {
             while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();
                 pathingCnt_++;
-                if (pathingCnt_ > MAX_DEPTH) {
+                if (pathingCnt_ > 8) {
                     break;
                 }
             }
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateRight();

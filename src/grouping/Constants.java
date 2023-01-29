@@ -1,4 +1,4 @@
-package launcher_bench;
+package grouping;
 
 import battlecode.common.Direction;
 
@@ -10,6 +10,12 @@ public class Constants {
 
     public static final int CARRIER_COST_AD = 50;
     public static final int CARRIER_ATTACK_DIS = 9;
+
+    public static final int AMP_COST_AD = 30;
+    public static final int AMP_COST_MN = 15;
+
+    public static final int ANCHOR_COST_MN = 80;
+    public static final int ANCHOR_COST_AD = 80;
 
     /** Array containing all the possible movement directions. */
     public static final Direction[] directions = {

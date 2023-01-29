@@ -1,4 +1,4 @@
-package launcher_bench.util;
+package grouping.util;
 
 /**
  * Interface to represent ints up to 65535 (2^16-1)

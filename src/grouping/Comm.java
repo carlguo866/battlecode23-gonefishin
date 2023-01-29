@@ -1,7 +1,7 @@
-package launcher_bench;
+package grouping;
 
 import battlecode.common.*;
-import launcher_bench.util.FastIterableIntSet;
+import grouping.util.FastIterableIntSet;
 
 /***
  *
@@ -14,19 +14,19 @@ import launcher_bench.util.FastIterableIntSet;
  * [ROTATIONAL, VERTIAL, HORIZONTAL]
  * 64-67: 4 bits indicating whether the 4 HQs are congested
  *
- * well info 96-203 bits
- * wells info starting bit 96 of 3 types, each 36 bits total 108 bits
- * each type containing 3 coords repping the 3 wells
- * 12 bits: well location
+ * well info 96-215 bits
+ * 2 types, each 60 bits (5 positionsk)
  *
- * enemy report starting bit 464 - 487
- * each of:
- * 12 bit: coord
- * 12 bits: last seen round number, could be % 64 later
+ * Amplifier 216-345, 5 amps each 26 bits for total of 130 bits
+ * 2 bits broadcast roundNumber for alive check
+ * 12 bits location,
+ * 12 bits for target location
  *
- * TODO
+ * Enemy report starting 346-441
+ * 4 HQ each have a slot of 24 bits reporting the enemy at that position, and the turn the enemy is seen
+ *
  * 35 islands
- * each 12(6) bits for pos, 1 bit for if index confirmed, 2 bit for if conquered
+ * 12 bits for pos, 2 bits for status
  */
 public class Comm extends RobotPlayer {
     private static final int ARRAY_LENGTH = 64; // this is how much we use rn
@@ -34,8 +34,9 @@ public class Comm extends RobotPlayer {
     private static final int CONGEST_BIT = 64;
     private static final int CARRIER_REPORT_BIT = 80;
     private static final int WELL_INFO_BIT = 96;
-    private static final int ENEMY_BIT = 487;
-    private static final int ISLAND_BIT = 511;
+    private static final int AMPLIFIER_BIT = 216;
+    private static final int ENEMY_BIT = 346;
+    private static final int ISLAND_BIT = 534;
 
     private static final int CARRIER_REPORT_LEN = 16;
 
@@ -83,8 +84,7 @@ public class Comm extends RobotPlayer {
             updateSym();
         }
 
-        if (needWellsUpdate &&
-                (rc.getType() == RobotType.HEADQUARTERS || rc.getType() == RobotType.CARRIER)) {
+        if (needWellsUpdate) {
             updateWells();
         }
     }
@@ -213,21 +213,41 @@ public class Comm extends RobotPlayer {
         writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, 0);
     }
 
+    // remnents of amp stuff
+//    public static final int AMPLIFIER_LEN = 26;
+//    public static void amplifierUpdate(int index, MapLocation targetLocation) throws GameActionException {
+//        writeBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index, AMPLIFIER_LEN,
+//                (rc.getRoundNum() % 4 << 24) + (loc2int(rc.getLocation()) << 12) + loc2int(targetLocation));
+//    }
+//    public static MapLocation getTargetLocation(int index) {
+//        return int2loc(readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index + 14, 12));
+//    }
+//    public static MapLocation getAmpLocation(int index) {
+//        return int2loc(readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index + 2, 12));
+//    }
+//    public static void cleanupAmplifier() {
+//        for (int i = 5; --i >=0;) {
+//            int val = readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * i, AMPLIFIER_LEN);
+//            if(val != 0 && Math.abs((val >> 24) - rc.getRoundNum() % 4) == 2) {
+//                System.out.printf("Amp %d dead?, reset\n", i);
+//                writeBits(AMPLIFIER_BIT + AMPLIFIER_LEN * i, AMPLIFIER_LEN, 0);
+//            }
+//        }
+//    }
+
     // enemy report starting
-    public static void reportEnemy(MapLocation location, int roundNumber) {
-        if (getEnemyLoc() != null && roundNumber <= getEnemyRound()) { // ignore old report
+    private static int ENEMY_LEN = 24;
+    public static void reportEnemy(int index, MapLocation location, int roundNumber) {
+        if (getEnemyLoc(index) != null && roundNumber <= getEnemyRound(index)) { // ignore old report
             return;
         }
-        writeBits(ENEMY_BIT, 12, loc2int(location));
-        writeBits(ENEMY_BIT + 12, 12, roundNumber);
+        writeBits(ENEMY_BIT + index * ENEMY_LEN, ENEMY_LEN, (loc2int(location) << 12) + roundNumber);
     }
-
-    public static MapLocation getEnemyLoc() {
-        return int2loc(readBits(ENEMY_BIT, 12));
+    public static MapLocation getEnemyLoc(int index) {
+        return int2loc(readBits(ENEMY_BIT + index * ENEMY_LEN, 12));
     }
-
-    public static int getEnemyRound() {
-        return readBits(ENEMY_BIT + 12, 12);
+    public static int getEnemyRound(int index) {
+        return readBits(ENEMY_BIT + index * ENEMY_LEN + 12, 12);
     }
 
     // island storage
@@ -244,6 +264,24 @@ public class Comm extends RobotPlayer {
         return 36;
     }
 
+    // returns the index, or 0 if not found
+    public static int getClosestFriendlyIslandIndex() {
+        int rv = 0;
+        MapLocation curLoc = rc.getLocation();
+        int dis = Integer.MAX_VALUE;
+        for (int i = islandCount; --i >= 0;) {
+            int val = readBits(ISLAND_BIT + i * 14, 14);
+            if ((val & 3) == ISLAND_FRIENDLY) {
+                int newDis = curLoc.distanceSquaredTo(int2loc(val >> 2));
+                if (rv == 0 || dis > newDis) {
+                    rv = i + 1;
+                    dis = newDis;
+                }
+            }
+        }
+        return rv;
+    }
+
     public static MapLocation getIslandLocation(int index) {
         return int2loc(readBits(ISLAND_BIT + (index - 1) * 14, 12));
     }
@@ -252,17 +290,17 @@ public class Comm extends RobotPlayer {
         return readBits(ISLAND_BIT + (index - 1) * 14 + 12, 2);
     }
 
+    // status of -1 means no status report (from carrier, default to neutral)
     public static void reportIsland(MapLocation loc, int index, int status) throws GameActionException{
         //storing island index i at (i-1) since island indexes starts at 1
         int val = readBits(ISLAND_BIT + (index - 1) * 14, 14);
-        if (val != 0 && val % 4 == status) {
+        if (val != 0 && (val % 4 == status || status == -1)) {
             return;
         }
-        if (val % 4 == 3 && status == 0) {
-            return;
+        if (status == -1) {
+            status = ISLAND_NEUTRAL;
         }
         writeBits(ISLAND_BIT + (index-1) * 14, 14, (loc2int(loc) * 4) + status);
-        commit_write();
     }
 
     public static MapLocation getClosestIsland() {

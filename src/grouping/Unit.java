@@ -1,4 +1,4 @@
-package launcher_bench;
+package grouping;
 
 import battlecode.common.*;
 
@@ -86,7 +86,7 @@ public class Unit extends RobotPlayer {
 
     // new path finding code from Ray
     private static final int PRV_LENGTH = 60;
-    private static final int TURNS_BEFORE_SWITCH = 15;
+    private static final int TURNS_BEFORE_SWITCH = 20;
     private static Direction[] prv = new Direction[PRV_LENGTH];
     private static int pathingCnt = 0;
     private static MapLocation lastPathingTarget = null;
@@ -97,6 +97,10 @@ public class Unit extends RobotPlayer {
     private static int currentTurnLen = 0;
     private static int currentMaxTurnLen = TURNS_BEFORE_SWITCH;
     private static int lastmovecount = 0;
+    private static Direction[] prv_ = new Direction[PRV_LENGTH];
+    private static int pathingCnt_ = 0;
+    static int MAX_DEPTH = 15;
+
     static void moveToward(MapLocation location) throws GameActionException {
         // reset queue when target location changes or there's gap in between calls
         if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 2) {
@@ -153,7 +157,7 @@ public class Unit extends RobotPlayer {
                     tryMoveDir(dir);
                 } else {
                     //rng = new Random(rc.getID());
-                    //currentTurnDir = rng.nextInt() % 2;
+                    currentTurnDir = getTurnDir(dir, location);
                     while (!canPass(dir) && pathingCnt != 8) {
                         prv[pathingCnt] = dir;
                         pathingCnt++;
@@ -218,27 +222,119 @@ public class Unit extends RobotPlayer {
         lastPathingTurn = turnCount;
     }
 
-    static boolean canPass(Direction dir, Direction targetDir) throws GameActionException {
-        MapLocation loc = rc.getLocation().add(dir);
-        if (!rc.onTheMap(loc))
-            return false;
-        MapInfo info = rc.senseMapInfo(loc);
-        if (!info.isPassable())
-            return false;
-        RobotInfo robot = rc.senseRobotAtLocation(loc);
-        if (robot != null)
-            return false;
-        // disallow going into enemy HQ attack range when symmetry confirmed
-        if (getClosestDis(Comm.enemyHQLocations) > 9 && getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
+    static int getSteps(MapLocation a, MapLocation b) {
+        int xdif = a.x - b.x;
+        int ydif = a.y - b.y;
+        if (xdif < 0) xdif = -xdif;
+        if (ydif < 0) ydif = -ydif;
+        if (xdif > ydif) return xdif;
+        else return ydif;
+    }
+
+    
+    static int getTurnDir(Direction direction, MapLocation target) throws GameActionException{
+        MapLocation now = rc.getLocation();
+        int moveLeft = 0;
+        int moveRight = 0;
+        
+        pathingCnt_ = 0;
+        Direction dir = direction;
+        while (!canPass(now.add(dir), dir) && pathingCnt_ != 8) {
+            prv_[pathingCnt_] = dir;
+            pathingCnt_++;
+            dir = dir.rotateLeft();
+            if (pathingCnt_ > MAX_DEPTH) {
+                break;
+            }
+        }
+        now = now.add(dir);
+        
+        while (pathingCnt_ > 0) {
+            moveLeft++;
+            if (moveLeft > MAX_DEPTH) {
+                break;
+            }
+            while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
+                pathingCnt_--;
+            }
+            while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
+                prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
+                pathingCnt_++;
+                if (pathingCnt_ > MAX_DEPTH) {
+                    break;
+                }
+            }
+            if (pathingCnt_ > MAX_DEPTH) {
+                break;
+            }
+            Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateLeft();
+            now = now.add(moveDir);
+        }
+        MapLocation leftend = now;
+        pathingCnt_ = 0;
+        now = rc.getLocation();
+        dir = direction;
+        while (!canPass(dir) && pathingCnt_ != 8) {
+            prv_[pathingCnt_] = dir;
+            pathingCnt_++;
+            dir = dir.rotateRight();
+            if (pathingCnt_ > MAX_DEPTH) {
+                break;
+            }
+        }
+        now = now.add(dir);
+        
+        while (pathingCnt_ > 0) {
+            moveRight++;
+            if (moveRight > MAX_DEPTH) {
+                break;
+            }
+            while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
+                pathingCnt_--;
+            }
+            while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
+                prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();
+                pathingCnt_++;
+                if (pathingCnt_ > MAX_DEPTH) {
+                    break;
+                }
+            }
+            if (pathingCnt_ > MAX_DEPTH) {
+                break;
+            }
+            Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateRight();
+            now = now.add(moveDir);
+        }
+        MapLocation rightend = now;
+        //System.out.println(moveLeft);
+        //System.out.println(moveRight);
+        if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return 0;
+        if (moveLeft + getSteps(leftend, target) <= moveRight + getSteps(rightend, target)) return 0;
+        else return 1;
+    }
+
+    static boolean canPass(MapLocation loc, Direction targetDir) throws GameActionException {
+        if (!MapRecorder.check(loc, targetDir)) return false;
+        /*
+        if (getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
             return false;
         }
-        Direction current = info.getCurrentDirection();
-        // only allow currents blowing in the direction of the target direction
-        if (current == Direction.CENTER || current == targetDir
-                || current == targetDir.rotateLeft() || current == targetDir.rotateRight())
-            return true;
-        // only allow empty carrier to go onto current for now
-        return rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12;
+        */
+        if (!rc.canSenseLocation(loc)) return true;
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        if (robot != null)
+            return false; 
+        return true;
+    }
+
+    static boolean canPass(Direction dir, Direction targetDir) throws GameActionException {
+        MapLocation loc = rc.getLocation().add(dir);
+        if (!MapRecorder.check(loc, targetDir)) return false;
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        // anchoring carriers don't yield to other robots
+        if (robot != null && (rc.getNumAnchors(Anchor.STANDARD) == 0 || robot.type == RobotType.HEADQUARTERS))
+                return false;
+        return true;
     }
 
     static boolean canPass(Direction dir) throws GameActionException {

@@ -290,19 +290,27 @@ public class Launcher extends Unit {
                 forwardDir.rotateLeft().rotateLeft(), forwardDir.rotateRight().rotateRight()};
         Direction bestDir = null;
         int minCanSee = Integer.MAX_VALUE;
+        boolean bestHasCloud = false;
         // pick a direction to chase to minimize the number of enemy launchers that can see us
         for (Direction dir : dirs) {
             if (rc.canMove(dir) && rc.getLocation().add(dir).distanceSquaredTo(location) <= ATTACK_DIS) {
                 int canSee = 0;
+                boolean hasCloud = rc.senseCloud(rc.getLocation().add(dir));
                 for (int i = enemyLauncherCnt; --i >= 0;){
-                    if (rc.getLocation().add(dir).distanceSquaredTo(enemyLaunchers[i].location) <= VISION_DIS) {
+                    int newDis = rc.getLocation().add(dir).distanceSquaredTo(enemyLaunchers[i].location);
+                    if (newDis <= 4 || (newDis <= VISION_DIS && !hasCloud && !enemyInCloud[i])) {
                         canSee++;
                     }
                 }
                 if (minCanSee > canSee) {
                     bestDir = dir;
                     minCanSee = canSee;
-                } else if (minCanSee == canSee && isDiagonal(bestDir) && !isDiagonal(dir)) {
+                    bestHasCloud = hasCloud;
+                } else if (minCanSee == canSee && bestHasCloud && !hasCloud) {
+                    // we then prefer to chase into a grid without cloud, TODO more testing on this
+                    bestDir = dir;
+                    bestHasCloud = false;
+                } else if (minCanSee == canSee && bestHasCloud == hasCloud && isDiagonal(bestDir) && !isDiagonal(dir)) {
                     // from Cow: we prefer non-diagonal moves to preserve formation
                     bestDir = dir;
                 }
@@ -321,6 +329,7 @@ public class Launcher extends Unit {
                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
         Direction bestDir = null;
         int minCanSee = Integer.MAX_VALUE;
+        boolean bestHasCloud = false;
         // pick a direction to kite back to minimize the number of enemy launchers that can see us
         for (Direction dir : dirs) {
             if (rc.canMove(dir)) {
@@ -335,7 +344,11 @@ public class Launcher extends Unit {
                 if (minCanSee > canSee) {
                     bestDir = dir;
                     minCanSee = canSee;
-                } else if (minCanSee == canSee && isDiagonal(bestDir) && !isDiagonal(dir)) {
+                    bestHasCloud = hasCloud;
+                } else if (minCanSee == canSee && bestHasCloud && !hasCloud) { // we then prefer to kite into a grid without cloud
+                    bestDir = dir;
+                    bestHasCloud = false;
+                } else if (minCanSee == canSee && bestHasCloud == hasCloud && isDiagonal(bestDir) && !isDiagonal(dir)) {
                     // from Cow: we prefer non-diagonal moves to preserve formation
                     bestDir = dir;
                 }

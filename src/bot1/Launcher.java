@@ -150,19 +150,22 @@ public class Launcher extends Unit {
     }
 
     static void macro() throws GameActionException {
-        // only macro move in even turns
-        if (!rc.isMovementReady() || rc.getRoundNum() % 2 == 0) return;
+        // Cow: only macro move in even turns
+        // try return immediately after a move command, so if we stuck we won't overrun turns
+        if (!rc.isMovementReady() || rc.getRoundNum() % 2 == 0)
+            return;
         if (Comm.needSymmetryReport && rc.getRoundNum() > 150 && rc.getID() % 8 == 0) {
             moveToward(getClosestLoc(Comm.friendlyHQLocations));
             indicator += "gotsym";
             return;
         }
-        tryIslandStuff();
+        if (tryIslandStuff())
+            return;
         if (anchoringCarrier != null) { // try escorting anchoring carrier
             moveToward(anchoringCarrier);
             indicator += "escort,";
+            return;
         }
-        if (!rc.isMovementReady()) return;
         if (lastSym != Comm.symmetry) {
             // recaculate the closest HQ when sym changes
             lastSym = Comm.symmetry;
@@ -172,6 +175,7 @@ public class Launcher extends Unit {
         MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
         if (rc.getLocation().distanceSquaredTo(closestEnemyHQ) <= 9) {
             tryMoveDir(rc.getLocation().directionTo(closestEnemyHQ).opposite());
+            return;
         }
         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
@@ -187,7 +191,8 @@ public class Launcher extends Unit {
     }
 
     private static int lastFailedHealingTurn = -1000;
-    static void tryIslandStuff() throws GameActionException {
+    // returns whether has moved
+    static boolean tryIslandStuff() throws GameActionException {
         // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
         boolean needHeal = rc.getRoundNum() - lastFailedHealingTurn > 100 &&
                 ((rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < 100);
@@ -208,19 +213,21 @@ public class Launcher extends Unit {
                     state = HEALING;
                     MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
                     moveToward(locs[FastMath.rand256() % locs.length]);
-                    return;
+                    return true;
                 }
             }
             if (occupyingTeam == oppTeam || (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
                 moveToward(locs[FastMath.rand256() % locs.length]);
-                return;
+                return true;
             }
         }
         if (rc.isMovementReady() && friendlyIslandIndex != 0) {
             indicator += "goheal,";
             moveToward(Comm.getIslandLocation(friendlyIslandIndex));
+            return true;
         }
+        return false;
     }
 
     static void micro() throws GameActionException {

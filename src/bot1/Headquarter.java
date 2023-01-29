@@ -89,8 +89,9 @@ public class Headquarter extends Unit {
         int maxLauncherSpawn = Math.min(5, usableMN / Constants.LAUNCHER_COST_MN);
         if (canBuildLauncher && (maxLauncherSpawn > enemyCount || turnCount == 0)) {
             // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
             for (int i = maxLauncherSpawn; --i >= 0 && rc.isActionReady();) {
-                trySpawn(RobotType.LAUNCHER, new MapLocation(mapWidth / 2, mapHeight / 2));
+                trySpawn(RobotType.LAUNCHER, closestEnemyHQ);
             }
         }
     }

@@ -1,26 +1,9 @@
 package bot1;
 
 import battlecode.common.*;
-
-import java.util.Map;
-import java.util.Random;
+import bot1.util.FastMath;
 
 public class Launcher extends Unit {
-    static int betterDistance(MapLocation start, MapLocation end){
-        return (int) Math.max(Math.pow(Math.abs(start.x-end.x), 2), Math.pow(Math.abs(start.y-end.y), 2));
-    }
-
-    static boolean checkWall(MapLocation start, MapLocation end) throws GameActionException{
-        MapLocation iter = start.add(start.directionTo(end));
-        int hardstop = 0;
-        while (rc.canSenseLocation(iter) && !iter.equals(end) && hardstop < 4){
-            if (!rc.sensePassability(iter)) return true;
-            iter = iter.add(iter.directionTo(end));
-            hardstop++;
-        }
-        return false;
-    }
-
     static boolean isDiagonal(Direction dir) {
         return dir.dx * dir.dy != 0;
     }
@@ -32,7 +15,6 @@ public class Launcher extends Unit {
 
     private static final int ATTACKING = 1;
     private static final int HEALING = 2;
-    private static final Random rng = new Random(rc.getID());
 
     // macro vars
     static int lastSym;
@@ -46,14 +28,15 @@ public class Launcher extends Unit {
     static RobotInfo backupTarget = null;
     static RobotInfo chaseTarget = null;
 
-    private static final int MAX_ENEMY_CNT = 10;
+    private static final int MAX_ENEMY_CNT = 8;
     static RobotInfo[] enemyLaunchers = new RobotInfo[MAX_ENEMY_CNT];
+    static boolean[] enemyInCloud = new boolean[MAX_ENEMY_CNT];
     static int enemyLauncherCnt;
-    private static final int MAX_FRIENDLY_CNT = 8;
+    private static final int MAX_FRIENDLY_CNT = 6;
     static RobotInfo[] friendlyLaunchers = new RobotInfo[MAX_FRIENDLY_CNT];
+    static boolean[] friendInCloud = new boolean[MAX_ENEMY_CNT];
     static int friendlyLauncherCnt;
 
-    static RobotInfo closestEnemy = null;
     static RobotInfo groupingTarget = null;
     static int lastLauncherAttackRound = 0;
     static int ourTeamStrength = 1;
@@ -65,6 +48,7 @@ public class Launcher extends Unit {
         if (turnCount == 0) {
             // future: get from spawn queue if there are more than one roles
             // prioritize the closest enemy HQ
+            FastMath.initRand(rc);
             lastSym = Comm.symmetry;
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
@@ -75,6 +59,9 @@ public class Launcher extends Unit {
         if (rc.isActionReady()){
             sense();
             micro();
+        }
+        if (rc.isActionReady()) {
+            tryGuessAttack();
         }
         // have launchers perform sym check
         if (Comm.needSymmetryReport && rc.canWriteSharedArray(0, 0)) {
@@ -96,7 +83,6 @@ public class Launcher extends Unit {
     static void sense() throws GameActionException {
         anchoringCarrier = null;
         attackTarget = null;
-        closestEnemy = null;
         chaseTarget = null;
         groupingTarget = null;
         backupTarget = null;
@@ -118,6 +104,7 @@ public class Launcher extends Unit {
                             && (robot.location.distanceSquaredTo(rc.getLocation()) < groupingTarget.location.distanceSquaredTo(rc.getLocation()))))) {
                         groupingTarget = robot;
                     }
+                    friendInCloud[friendlyLauncherCnt] = rc.senseCloud(robot.location);
                     friendlyLaunchers[friendlyLauncherCnt++] = robot;
                     ourTeamStrength += 1;
                 } else if (robot.type == RobotType.CARRIER && robot.getNumAnchors(Anchor.STANDARD) != 0) {
@@ -129,19 +116,17 @@ public class Launcher extends Unit {
                     if (!Comm.isSymmetryConfirmed && getClosestDis(robot.location, Comm.enemyHQLocations) != 0) {
                         Comm.eliminateSym(Comm.symmetry);
                     }
+                    MapRecorder.reportEnemyHQ(robot.location); // this is fairly optimized and unexpensive
                     continue;
                 } else if (robot.type == RobotType.LAUNCHER || robot.type == RobotType.DESTABILIZER) {
                     if (enemyLauncherCnt >= MAX_ENEMY_CNT) {
                         continue;
                     }
+                    enemyInCloud[enemyLauncherCnt] = rc.senseCloud(robot.location);
                     enemyLaunchers[enemyLauncherCnt++] = robot;
                     ourTeamStrength -= 1;
                     if (robot.location.distanceSquaredTo(rc.getLocation()) > ATTACK_DIS) {
                         chaseTarget = robot;
-                    }
-                    if (closestEnemy == null || rc.getLocation().distanceSquaredTo(closestEnemy.location) >
-                            rc.getLocation().distanceSquaredTo(robot.location)) {
-                        closestEnemy = robot;
                     }
                 } else {
                     int dis = rc.getLocation().distanceSquaredTo(robot.location);
@@ -159,19 +144,22 @@ public class Launcher extends Unit {
     }
 
     static void macro() throws GameActionException {
-        // only macro move in even turns
-        if (!rc.isMovementReady() || rc.getRoundNum() % 2 == 0) return;
+        // Cow: only macro move in even turns
+        // try return immediately after a move command, so if we stuck we won't overrun turns
+        if (!rc.isMovementReady() || rc.getRoundNum() % 2 == 0)
+            return;
         if (Comm.needSymmetryReport && rc.getRoundNum() > 150 && rc.getID() % 8 == 0) {
             moveToward(getClosestLoc(Comm.friendlyHQLocations));
             indicator += "gotsym";
             return;
         }
-        tryIslandStuff();
+        if (tryIslandStuff())
+            return;
         if (anchoringCarrier != null) { // try escorting anchoring carrier
             moveToward(anchoringCarrier);
             indicator += "escort,";
+            return;
         }
-        if (!rc.isMovementReady()) return;
         if (lastSym != Comm.symmetry) {
             // recaculate the closest HQ when sym changes
             lastSym = Comm.symmetry;
@@ -181,6 +169,7 @@ public class Launcher extends Unit {
         MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
         if (rc.getLocation().distanceSquaredTo(closestEnemyHQ) <= 9) {
             tryMoveDir(rc.getLocation().directionTo(closestEnemyHQ).opposite());
+            return;
         }
         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
@@ -196,7 +185,8 @@ public class Launcher extends Unit {
     }
 
     private static int lastFailedHealingTurn = -1000;
-    static void tryIslandStuff() throws GameActionException {
+    // returns whether has moved
+    static boolean tryIslandStuff() throws GameActionException {
         // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
         boolean needHeal = rc.getRoundNum() - lastFailedHealingTurn > 100 &&
                 ((rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < 100);
@@ -216,20 +206,22 @@ public class Launcher extends Unit {
                 } else {
                     state = HEALING;
                     MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
-                    moveToward(locs[rng.nextInt(locs.length)]);
-                    return;
+                    moveToward(locs[FastMath.rand256() % locs.length]);
+                    return true;
                 }
             }
             if (occupyingTeam == oppTeam || (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
-                moveToward(locs[rng.nextInt(locs.length)]);
-                return;
+                moveToward(locs[FastMath.rand256() % locs.length]);
+                return true;
             }
         }
         if (rc.isMovementReady() && friendlyIslandIndex != 0) {
             indicator += "goheal,";
             moveToward(Comm.getIslandLocation(friendlyIslandIndex));
+            return true;
         }
+        return false;
     }
 
     static void micro() throws GameActionException {
@@ -239,28 +231,47 @@ public class Launcher extends Unit {
 //                chaseTarget == null? "" : chaseTarget.location,
 //                cachedEnemyLocation == null? "" : cachedEnemyLocation,
 //                rc.isMovementReady());
-        indicator += String.format("gt%s", groupingTarget == null? null : groupingTarget.location);
-        if (attackTarget != null) {
-            lastLauncherAttackRound = rc.getRoundNum();
-            if (rc.canAttack(attackTarget.location)) {
-                cachedEnemyLocation = attackTarget.location;
-                cachedRound = rc.getRoundNum();
-                rc.attack(attackTarget.location);
+        RobotInfo target = attackTarget == null? backupTarget : attackTarget;
+        if (target != null) {
+            if (target == attackTarget) {
+                lastLauncherAttackRound = rc.getRoundNum();
             }
-            kite(closestEnemy.location);
-        } else if (backupTarget != null) {
-            if (rc.canAttack(backupTarget.location)) {
+            RobotInfo deadTarget = null;
+            if (rc.canAttack(target.location)) {
+                cachedRound = rc.getRoundNum();
+                if (target.health <= DAMAGE) {
+                    deadTarget = target;
+                }
+                rc.attack(target.location);
+            }
+            // find the closest guy alive, focus on launchers first, cache him and kite back
+            int minDis = Integer.MAX_VALUE;
+            cachedEnemyLocation = null;
+            for (int i = enemyLauncherCnt; --i >= 0;) {
+                RobotInfo enemy = enemyLaunchers[i];
+                int dis = enemy.location.distanceSquaredTo(rc.getLocation());
+                if (enemy != deadTarget && dis < minDis) {
+                    cachedEnemyLocation = enemy.location;
+                    minDis = dis;
+                }
+            }
+            if (cachedEnemyLocation == null && backupTarget != null && backupTarget != deadTarget) {
                 cachedEnemyLocation = backupTarget.location;
-                cachedRound = rc.getRoundNum();
-                rc.attack(backupTarget.location);
             }
-            kite(backupTarget.location);
+            if (cachedEnemyLocation != null && rc.isMovementReady()) {
+                kite(cachedEnemyLocation);
+            }
         }
         if (rc.isMovementReady() && rc.isActionReady()) {
-            if (chaseTarget != null && rc.getHealth() > chaseTarget.health) {
-                chase(chaseTarget.location);
-            }
-            if (cachedEnemyLocation != null && rc.getRoundNum() - cachedRound <= 2) {
+            if (chaseTarget != null) {
+                cachedEnemyLocation = chaseTarget.location;
+                cachedRound = rc.getRoundNum();
+                if (rc.getHealth() > chaseTarget.health || ourTeamStrength > 2 || chaseTarget.type != RobotType.LAUNCHER) {
+                    chase(chaseTarget.location);
+                } else { // we are at disadvantage, pull back
+                    kite(chaseTarget.location);
+                }
+            } else if (cachedEnemyLocation != null && rc.getRoundNum() - cachedRound <= 2) {
                 chase(cachedEnemyLocation);
             }
         }
@@ -314,8 +325,10 @@ public class Launcher extends Unit {
         for (Direction dir : dirs) {
             if (rc.canMove(dir)) {
                 int canSee = 0;
+                boolean hasCloud = rc.senseCloud(rc.getLocation().add(dir));
                 for (int i = enemyLauncherCnt; --i >= 0;){
-                    if (rc.getLocation().add(dir).distanceSquaredTo(enemyLaunchers[i].location) <= VISION_DIS) {
+                    int newDis = rc.getLocation().add(dir).distanceSquaredTo(enemyLaunchers[i].location);
+                    if (newDis <= 4 || (newDis <= VISION_DIS && !hasCloud && !enemyInCloud[i])) {
                         canSee++;
                     }
                 }
@@ -334,6 +347,90 @@ public class Launcher extends Unit {
         }
     }
 
+    private static final int[] GUESS_ATTACK_DX = {-4, -3, -3, -3, -3, -3, -2, -2, -2, -2, -2, -2, -1, -1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4};
+    private static final int[] GUESS_ATTACK_DY = {0, -2, -1, 0, 1, 2, -3, -2, -1, 1, 2, 3, -3, -2, 2, 3, -4, -3, 3, 4, -3, -2, 2, 3, -3, -2, -1, 1, 2, 3, -2, -1, 0, 1, 2, 0};
+    private static void tryGuessAttack() throws GameActionException {
+        // costs 800 bytecode
+        // first try to attack cached target and its adjacent squares
+        if (cachedEnemyLocation != null
+                && rc.getRoundNum() - cachedRound <= 8) {
+            Direction targetDir = rc.getLocation().directionTo(cachedEnemyLocation);
+            for (int i = 9; --i >= 0;) {
+                MapLocation loc = null;
+                switch (i) {
+                    case 8: loc = cachedEnemyLocation; break;
+                    case 7: loc = cachedEnemyLocation.add(targetDir); break;
+                    case 6: loc = cachedEnemyLocation.add(targetDir.opposite()); break;
+                    case 5: loc = cachedEnemyLocation.add(targetDir.rotateLeft()); break;
+                    case 4: loc = cachedEnemyLocation.add(targetDir.rotateRight()); break;
+                    case 3: loc = cachedEnemyLocation.add(targetDir.opposite().rotateRight()); break;
+                    case 2: loc = cachedEnemyLocation.add(targetDir.opposite().rotateLeft()); break;
+                    case 1: loc = cachedEnemyLocation.add(targetDir.rotateRight().rotateRight()); break;
+                    case 0: loc = cachedEnemyLocation.add(targetDir.rotateLeft().rotateLeft()); break;
+                }
+                if (!rc.canSenseLocation(loc) && rc.canAttack(loc)) {
+                    char val = MapRecorder.vals[loc.x * mapHeight + loc.y];
+                    if ((val & MapRecorder.SEEN_BIT) != 0
+                            && (val & MapRecorder.PASSIABLE_BIT) == 0
+                            && val != MapRecorder.WITHIN_HQ_RANGE) {
+                        continue; // ignore recorded walls
+                    }
+                    indicator += String.format("guesscache%s,", loc);
+                    rc.attack(loc);
+                    return;
+                }
+            }
+        }
+
+        MapLocation guessTarget = null;
+        if (rc.senseCloud(rc.getLocation())) { // I am in a cloud, try attack a tile I can't see
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+            int disToTarget = Integer.MAX_VALUE;
+            int curX = rc.getLocation().x, curY = rc.getLocation().y;
+            for (int i = 10; --i >= 0;) {
+                int j = FastMath.rand256() % GUESS_ATTACK_DX.length;
+                MapLocation loc = new MapLocation(curX + GUESS_ATTACK_DX[j], curY + GUESS_ATTACK_DY[j]);
+                if (!rc.onTheMap(loc))
+                    continue;
+                char val = MapRecorder.vals[loc.x * mapHeight + loc.y];
+                if ((val & MapRecorder.SEEN_BIT) != 0
+                        && (val & MapRecorder.PASSIABLE_BIT) == 0
+                        && val != MapRecorder.WITHIN_HQ_RANGE) {
+                    continue; // ignore recorded walls
+                }
+                int dis = loc.distanceSquaredTo(closestEnemyHQ);
+                if (dis != 0 && dis < disToTarget) {
+                    guessTarget = loc;
+                    disToTarget = dis;
+                }
+            }
+            if (guessTarget != null && rc.canAttack(guessTarget)) {
+                indicator += String.format("guess%s,", guessTarget);
+                rc.attack(guessTarget);
+                return;
+            }
+        }
+
+        MapLocation[] clouds = rc.senseNearbyCloudLocations();
+        if (rc.isActionReady() && clouds.length > 0) {
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+            int disToTarget = Integer.MAX_VALUE;
+            for (int i = 10; --i >= 0;) {
+                int j = FastMath.rand256() % clouds.length;
+                MapLocation loc = clouds[j];
+                int dis = closestEnemyHQ.distanceSquaredTo(loc);
+                if (dis != 0 && dis < disToTarget) {
+                    disToTarget = dis;
+                    guessTarget = loc;
+                }
+            }
+            if (guessTarget != null && rc.canAttack(guessTarget)) {
+                indicator += String.format("guess%s,", guessTarget);
+                rc.attack(guessTarget);
+            }
+        }
+    }
+
     private static RobotInfo getImmediatelyAttackableTarget() {
         int minHitReqired = Integer.MAX_VALUE;
         RobotInfo rv = null;
@@ -349,7 +446,8 @@ public class Launcher extends Unit {
             }
             int canAttackFriendCnt = 1;
             for (int friend_i = friendlyLauncherCnt; --friend_i >= 0;) {
-                if (friendlyLaunchers[friend_i].location.distanceSquaredTo(enemy.location) <= ATTACK_DIS) {
+                int friendEnemyDis = friendlyLaunchers[friend_i].location.distanceSquaredTo(enemy.location);
+                if (friendEnemyDis <= 4 || (friendEnemyDis <= ATTACK_DIS && !enemyInCloud[enemy_i] && !friendInCloud[friend_i])) {
                     canAttackFriendCnt++;
                 }
             }

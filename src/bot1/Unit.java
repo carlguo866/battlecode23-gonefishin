@@ -2,8 +2,6 @@ package bot1;
 
 import battlecode.common.*;
 
-import java.util.Random;
-
 
 /**
  * This class contains logic / variable that is shared between all units
@@ -107,17 +105,22 @@ public class Unit extends RobotPlayer {
         // reset queue when target location changes or there's gap in between calls
         if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 2) {
             pathingCnt = 0;
+            stuckCnt = 0;
         }
         indicator += String.format("2%sc%ds%d,", location, pathingCnt, stuckCnt);
 
         if (rc.isMovementReady()) {
             // we increase stuck count only if it's a new turn (optim for empty carriers)
-            if (rc.getLocation().equals(lastLocation) && turnCount != lastPathingTurn) {
-                stuckCnt += 1;
+            if (rc.getLocation().equals(lastLocation)) {
+                if (turnCount != lastPathingTurn) {
+                    stuckCnt++;
+                }
             } else {
+                lastLocation = rc.getLocation();
                 stuckCnt = 0;
             }
-            lastLocation = rc.getLocation();
+            lastPathingTarget = location;
+            lastPathingTurn = turnCount;
             if (stuckCnt >= 3) {
                 indicator += "stuck reset";
                 randomMove();
@@ -168,7 +171,6 @@ public class Unit extends RobotPlayer {
                     }
                     if (pathingCnt == 8) {
                         indicator += "permblocked";
-                        randomMove();
                     } else if (rc.canMove(dir)) {
                         currentTurnLen++;
                         lastmovecount++;
@@ -179,11 +181,12 @@ public class Unit extends RobotPlayer {
                 while (pathingCnt > 0 && canPass(prv[pathingCnt - 1])) {
                     pathingCnt--;
                 }
+                int pathingCntCutOff = Math.min(PRV_LENGTH, pathingCnt + 8); // if 8 then all dirs blocked
                 if (currentTurnDir == 0) {
                     while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateLeft())) {
                         prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();
                         pathingCnt++;
-                        if (pathingCnt == PRV_LENGTH) {
+                        if (pathingCnt == pathingCntCutOff) {
                             pathingCnt = 0;
                             return;
                         }
@@ -202,7 +205,7 @@ public class Unit extends RobotPlayer {
                     while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateRight())) {
                         prv[pathingCnt] = prv[pathingCnt - 1].rotateRight();
                         pathingCnt++;
-                        if (pathingCnt == PRV_LENGTH) {
+                        if (pathingCnt == pathingCntCutOff) {
                             pathingCnt = 0;
                             return;
                         }
@@ -219,7 +222,6 @@ public class Unit extends RobotPlayer {
                 }
             }
         }
-
         lastPathingTarget = location;
         lastPathingTurn = turnCount;
     }
@@ -233,7 +235,8 @@ public class Unit extends RobotPlayer {
         else return ydif;
     }
 
-    
+
+    private static final int BYTECODE_CUTOFF = 2500;
     static int getTurnDir(Direction direction, MapLocation target) throws GameActionException{
         MapLocation now = rc.getLocation();
         int moveLeft = 0;
@@ -245,15 +248,18 @@ public class Unit extends RobotPlayer {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateLeft();
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
         }
         now = now.add(dir);
-        
+
+        int byteCodeRem = Clock.getBytecodesLeft();
+        if (byteCodeRem < BYTECODE_CUTOFF)
+            return 1;
         while (pathingCnt_ > 0) {
             moveLeft++;
-            if (moveLeft > MAX_DEPTH) {
+            if (moveLeft > MAX_DEPTH || Clock.getBytecodesLeft() < (byteCodeRem + BYTECODE_CUTOFF) / 2) {
                 break;
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
@@ -262,11 +268,11 @@ public class Unit extends RobotPlayer {
             while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
                 pathingCnt_++;
-                if (pathingCnt_ > MAX_DEPTH) {
+                if (pathingCnt_ > 8) {
                     break;
                 }
             }
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateLeft();
@@ -280,7 +286,7 @@ public class Unit extends RobotPlayer {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
             dir = dir.rotateRight();
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
         }
@@ -288,7 +294,7 @@ public class Unit extends RobotPlayer {
         
         while (pathingCnt_ > 0) {
             moveRight++;
-            if (moveRight > MAX_DEPTH) {
+            if (moveRight > MAX_DEPTH || Clock.getBytecodesLeft() < BYTECODE_CUTOFF) {
                 break;
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
@@ -297,11 +303,11 @@ public class Unit extends RobotPlayer {
             while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();
                 pathingCnt_++;
-                if (pathingCnt_ > MAX_DEPTH) {
+                if (pathingCnt_ > 8) {
                     break;
                 }
             }
-            if (pathingCnt_ > MAX_DEPTH) {
+            if (pathingCnt_ > 8) {
                 break;
             }
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateRight();

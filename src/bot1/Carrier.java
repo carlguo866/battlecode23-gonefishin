@@ -131,6 +131,8 @@ public class Carrier extends Unit {
                     closestEnemy = robot;
                     strength -= robot.health;
                 }
+            } else if (robot.type == RobotType.HEADQUARTERS) {
+                MapRecorder.reportEnemyHQ(robot.location);
             }
         }
         if (closestEnemy != null) {

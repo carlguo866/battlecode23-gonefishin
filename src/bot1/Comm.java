@@ -68,7 +68,7 @@ public class Comm extends RobotPlayer {
                 if (i >= 6 && i <= 13) {
                     needWellsUpdate = true;
                 }
-                if (i == 3) {
+                if (i == 3 && !isSymmetryConfirmed) {
                     needSymUpdate = true;
                 }
                 buffered_share_array[i] = rc.readSharedArray(i);
@@ -110,6 +110,7 @@ public class Comm extends RobotPlayer {
                 friendlyHQLocations[i] = location;
                 writeBits(i * 12, 12, loc2int(location));
                 numHQ = i + 1;
+                guessSym();
                 return i;
             }
         }
@@ -142,10 +143,10 @@ public class Comm extends RobotPlayer {
                         isSymEliminated[sym] = true;
                         writeBits(SYM_BIT + sym, 1, 1);
                         System.out.printf("eliminate sym %d from HQ at %s\n", sym, loc);
-                        guessSym();
                     }
                 }
             }
+            guessSym();
         }
     }
 

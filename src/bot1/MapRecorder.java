@@ -112,15 +112,15 @@ public class MapRecorder extends RobotPlayer {
         return set;
     }
 
+    private static final int HQ_SPAWNABLE_DX[] = {-3, 0, 0, 3, -2, -2, 2, 2, -2, -2, -1, -1, 1, 1, 2, 2, -2, 0, 0, 2, -1, -1, 1, 1, -1, 0, 0, 1};
+    private static final int HQ_SPAWNABLE_DY[] = {0, -3, 3, 0, -2, 2, -2, 2, -1, 1, -2, 2, -2, 2, -1, 1, 0, -2, 2, 0, -1, 1, -1, 1, 0, -1, 1, 0};
     // this func called at the start of each HQ to get us out of jail
     public static void hqInit() throws GameActionException {
         // use scripts/pos_gen.py
-        int HQ_SPAWNABLE_DX[] = {-3, 0, 0, 3, -2, -2, 2, 2, -2, -2, -1, -1, 1, 1, 2, 2, -2, 0, 0, 2, -1, -1, 1, 1, -1, 0, 0, 1};
-        int HQ_SPAWNABLE_DY[] = {0, -3, 3, 0, -2, 2, -2, 2, -1, 1, -2, 2, -2, 2, -1, 1, 0, -2, 2, 0, -1, 1, -1, 1, 0, -1, 1, 0};
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {
             if (infos[i].isPassable()) {
-                vals[infos[i].getMapLocation().x * mapHeight + infos[i].getMapLocation().y] = PASSIABLE_BIT;
+                vals[infos[i].getMapLocation().x * mapHeight + infos[i].getMapLocation().y] = (char) (PASSIABLE_BIT | infos[i].getCurrentDirection().ordinal());
                 Headquarter.sensablePassibleArea++;
             }
         }
@@ -132,7 +132,9 @@ public class MapRecorder extends RobotPlayer {
         for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
             int x = hqX + HQ_SPAWNABLE_DX[i];
             int y = hqY + HQ_SPAWNABLE_DY[i];
-            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight || (vals[x * mapHeight + y] & PASSIABLE_BIT) == 0)
+            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight
+                    || (vals[x * mapHeight + y] & PASSIABLE_BIT) == 0
+                    || (vals[x * mapHeight + y] & CURRENT_MASK) != 8)
                 continue;
             if (spawnableSet.contains(x + 1, y)) {spawnableSet.add(x, y); continue;}
             if (spawnableSet.contains(x + 1, y + 1)) {spawnableSet.add(x, y); continue;}
@@ -143,9 +145,54 @@ public class MapRecorder extends RobotPlayer {
             if (spawnableSet.contains(x - 1, y + 1)) {spawnableSet.add(x, y); continue;}
             if (spawnableSet.contains(x - 1, y - 1)) {spawnableSet.add(x, y);}
         }
+        // if there are enemy HQ, don't spawn in its range
+        for (RobotInfo robot : rc.senseNearbyRobots(-1, oppTeam)) {
+            if (robot.type == RobotType.HEADQUARTERS) {
+                int enemyX = robot.location.x;
+                int enemyY = robot.location.y;
+                for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
+                    int x = enemyX + HQ_SPAWNABLE_DX[i];
+                    int y = enemyY + HQ_SPAWNABLE_DY[i];
+                    spawnableSet.remove(x, y);
+                }
+            }
+        }
+        if (spawnableSet.size < 3) {
+            System.out.println("weird map, allowing all spawns");
+            for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
+                int x = hqX + HQ_SPAWNABLE_DX[i];
+                int y = hqY + HQ_SPAWNABLE_DY[i];
+                if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
+                    spawnableSet.add(x, y);
+                }
+            }
+        }
         spawnableSet.remove(hqX, hqY);
         spawnableSet.updateIterable();
         Headquarter.spawnableSet = spawnableSet;
+    }
+
+    public static final int WITHIN_HQ_RANGE = SEEN_BIT + 7;
+    // this magic number will be treat it as a wall in pathfinder,
+    // but will be considered by Launcher blind attack
+    public static void reportEnemyHQ(MapLocation loc) {
+        int hqX = loc.x;
+        int hqY = loc.y;
+        if (vals[hqX * mapHeight + hqY] == SEEN_BIT) {
+            return;
+        }
+        // since this will mess with symmetry scouting, we disable checking and reporting
+        Comm.isSymmetryConfirmed = true;
+        Comm.needSymmetryReport = false;
+        for (int i = HQ_SPAWNABLE_DX.length; --i >= 0;) {
+            int x = hqX + HQ_SPAWNABLE_DX[i];
+            int y = hqY + HQ_SPAWNABLE_DY[i];
+            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
+                continue;
+            }
+            vals[x * mapHeight + y] = WITHIN_HQ_RANGE;
+        }
+        vals[hqX * mapHeight + hqY] = SEEN_BIT;
     }
 
 //    remnents of defensive launcher strategy

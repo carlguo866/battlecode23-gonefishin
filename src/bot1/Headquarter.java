@@ -41,7 +41,6 @@ public class Headquarter extends Unit {
         usableEL = rc.getResourceAmount(ResourceType.ELIXIR);
 
         sense();
-        carrierCnt = Comm.getCarrierCnt();
 
         if (closestEnemy != null) {
             Comm.reportEnemy(hqid, closestEnemy.location, rc.getRoundNum());
@@ -73,7 +72,7 @@ public class Headquarter extends Unit {
     }
 
     private static void tryBuildAnchor() throws GameActionException {
-        if ((rc.getRobotCount() - carrierCnt) / Comm.numHQ > 20 && carrierCnt / Comm.numHQ > 10
+        if ((((rc.getRobotCount() - carrierCnt) / Comm.numHQ > 20 && carrierCnt / Comm.numHQ > 10) || (rc.getRoundNum() > 1200 && rc.getRobotCount() / Comm.numHQ > 12))
                 && rc.getNumAnchors(Anchor.STANDARD) == 0
                 && rc.getRoundNum() - lastRoundAnchorBuilt > 100) {
             usableAD -= Constants.ANCHOR_COST_AD;
@@ -89,8 +88,9 @@ public class Headquarter extends Unit {
         int maxLauncherSpawn = Math.min(5, usableMN / Constants.LAUNCHER_COST_MN);
         if (canBuildLauncher && (maxLauncherSpawn > enemyCount || turnCount == 0)) {
             // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
             for (int i = maxLauncherSpawn; --i >= 0 && rc.isActionReady();) {
-                trySpawn(RobotType.LAUNCHER, new MapLocation(mapWidth / 2, mapHeight / 2));
+                trySpawn(RobotType.LAUNCHER, closestEnemyHQ);
             }
         }
     }
@@ -106,6 +106,7 @@ public class Headquarter extends Unit {
     }
 
     private static void sense() throws GameActionException {
+        carrierCnt = Comm.getCarrierCnt();
         closestEnemy = null;
         friendlyCount = 0;
         spawnableTileOccupied = 0;
@@ -133,6 +134,7 @@ public class Headquarter extends Unit {
                 || (spawnableTileOccupied > spawnableSet.size / 2 && spawnableTileOccupied > 5)
                 || friendlyCount > 30
                 || spawnableTileOccupied > 12
+                || carrierCnt / Comm.numHQ > 30
                 || rc.getRobotCount() / Comm.numHQ > 80)
                 && rc.getRoundNum() > 100
                 && rc.getRobotCount() / Comm.numHQ > 30) {
@@ -142,7 +144,8 @@ public class Headquarter extends Unit {
                 isCongested = true;
             }
         } else if (isCongested
-                && rc.getRoundNum() - lastCongestedRound > 30) {
+                && rc.getRoundNum() - lastCongestedRound > 30
+                && rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ > 60) {
             System.out.println("not congested anymore somehow??");
             isCongested = false;
         }

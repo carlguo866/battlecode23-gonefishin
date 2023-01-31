@@ -142,6 +142,7 @@ public class Unit extends RobotPlayer {
             }
 
             if (currentTurnLen >= currentMaxTurnLen) {
+                //turn around if going to far
                 currentTurnLen = 0;
                 pathingCnt = 0;
                 currentTurnDir = (currentTurnDir + 1) % 2;
@@ -150,6 +151,7 @@ public class Unit extends RobotPlayer {
             }
 
             if (pathingCnt == 0) {
+                //if free of obstacle: try go directly to target
                 currentTurnLen = 0;
                 if (currentMaxTurnLen > TURNS_BEFORE_SWITCH && lastmovecount > currentMaxTurnLen / 3) {
                     currentMaxTurnLen = TURNS_BEFORE_SWITCH;
@@ -160,7 +162,7 @@ public class Unit extends RobotPlayer {
                 if (canPass(dir) || canPass(dir.rotateRight(), dir) || canPass(dir.rotateLeft(), dir)) {
                     tryMoveDir(dir);
                 } else {
-                    //rng = new Random(rc.getID());
+                    //encounters obstacle; run simulation to determine best way to go
                     currentTurnDir = getTurnDir(dir, location);
                     while (!canPass(dir) && pathingCnt != 8) {
                         prv[pathingCnt] = dir;
@@ -177,47 +179,28 @@ public class Unit extends RobotPlayer {
                     }
                 }
             } else {
+                //update stack of past directions, move to next available direction
                 while (pathingCnt > 0 && canPass(prv[pathingCnt - 1])) {
                     pathingCnt--;
                 }
                 int pathingCntCutOff = Math.min(PRV_LENGTH, pathingCnt + 8); // if 8 then all dirs blocked
-                if (currentTurnDir == 0) {
-                    while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateLeft())) {
-                        prv[pathingCnt] = prv[pathingCnt - 1].rotateLeft();
-                        pathingCnt++;
-                        if (pathingCnt == pathingCntCutOff) {
-                            pathingCnt = 0;
-                            return;
-                        }
-                    }
-                    Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateLeft();
-                    if (rc.canMove(moveDir)) {
-                        currentTurnLen++;
-                        lastmovecount++;
-                        rc.move(moveDir);
-                    } else {
-                        // a robot blocking us while we are following wall, wait
-                        indicator += "blocked";
+                while (pathingCnt > 0 && !canPass(currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight())) {
+                    prv[pathingCnt] = currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight();
+                    pathingCnt++;
+                    if (pathingCnt == pathingCntCutOff) {
+                        pathingCnt = 0;
+                        return;
                     }
                 }
-                else {
-                    while (pathingCnt > 0 && !canPass(prv[pathingCnt - 1].rotateRight())) {
-                        prv[pathingCnt] = prv[pathingCnt - 1].rotateRight();
-                        pathingCnt++;
-                        if (pathingCnt == pathingCntCutOff) {
-                            pathingCnt = 0;
-                            return;
-                        }
-                    }
-                    Direction moveDir = pathingCnt == 0? prv[pathingCnt] : prv[pathingCnt - 1].rotateRight();
-                    if (rc.canMove(moveDir)) {
-                        currentTurnLen++;
-                        lastmovecount++;
-                        rc.move(moveDir);
-                    } else {
-                        // a robot blocking us while we are following wall, wait
-                        indicator += "blocked";
-                    }
+                Direction moveDir = pathingCnt == 0? prv[pathingCnt] : 
+                    (currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight());
+                if (rc.canMove(moveDir)) {
+                    currentTurnLen++;
+                    lastmovecount++;
+                    rc.move(moveDir);
+                } else {
+                    // a robot blocking us while we are following wall, wait
+                    indicator += "blocked";
                 }
             }
         }
@@ -256,6 +239,7 @@ public class Unit extends RobotPlayer {
         int byteCodeRem = Clock.getBytecodesLeft();
         if (byteCodeRem < BYTECODE_CUTOFF)
             return 1;
+        //simulate turning left
         while (pathingCnt_ > 0) {
             moveLeft++;
             if (moveLeft > MAX_DEPTH || Clock.getBytecodesLeft() < (byteCodeRem + BYTECODE_CUTOFF) / 2) {
@@ -281,6 +265,7 @@ public class Unit extends RobotPlayer {
         pathingCnt_ = 0;
         now = rc.getLocation();
         dir = direction;
+        //simulate turning right
         while (!canPass(dir) && pathingCnt_ != 8) {
             prv_[pathingCnt_] = dir;
             pathingCnt_++;
@@ -313,8 +298,7 @@ public class Unit extends RobotPlayer {
             now = now.add(moveDir);
         }
         MapLocation rightend = now;
-        //System.out.println(moveLeft);
-        //System.out.println(moveRight);
+        //find best direction
         if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return 0;
         if (moveLeft + getSteps(leftend, target) <= moveRight + getSteps(rightend, target)) return 0;
         else return 1;

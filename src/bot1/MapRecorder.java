@@ -86,11 +86,10 @@ public class MapRecorder extends RobotPlayer {
         }
     }
 
-    public static FastIterableLocSet getMinableSquares(MapLocation mineLoc) {
+    public static FastIterableLocSet getMinableSquares(MapLocation mineLoc, ResourceType resourceType) {
         FastIterableLocSet set = new FastIterableLocSet(10);
-        set.add(mineLoc);
-        for (int i = 8; --i>=0;) {
-            MapLocation loc = mineLoc.add(Constants.directions[i]);
+        for (int i = 9; --i>=0;) {
+            MapLocation loc = mineLoc.add(Direction.values()[i]);
             if (!rc.onTheMap(loc)) {
                 continue;
             }
@@ -105,6 +104,20 @@ public class MapRecorder extends RobotPlayer {
                 MapLocation blowInto = loc.add(dir);
                 if (blowInto.isAdjacentTo(mineLoc) ||
                         (rc.onTheMap(blowInto) && (vals[blowInto.x * mapHeight + blowInto.y] & PASSIABLE_BIT) == 0 && (vals[blowInto.x * mapHeight + blowInto.y] & SEEN_BIT) != 0)) {
+                    // If a loc is adjacent to both AD and MN mine, it can only be used for MN
+                    if (resourceType == ResourceType.ADAMANTIUM) {
+                        boolean good = true;
+                        for (int j = 9; --j >=0;) {
+                            MapLocation adjLoc = loc.add(Direction.values()[j]);
+                            if (Carrier.wellsSeen[ResourceType.MANA.resourceID].contains(adjLoc)) {
+                                good = false;
+                                break;
+                            }
+                        }
+                        if (!good) {
+                            continue;
+                        }
+                    }
                     set.add(loc);
                 }
             }

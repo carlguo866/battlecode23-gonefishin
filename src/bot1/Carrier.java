@@ -47,7 +47,7 @@ public class Carrier extends Unit {
     static MapLocation scoutTarget = null;
     static MapLocation scoutCenter = null;
     static double scoutAngle = 0;
-    static FastIterableLocSet[] wellsSeen = {null, null, null};
+    public static FastIterableLocSet[] wellsSeen = {null, null, null};
     static FastIterableLocSet[] wellsToReport = {null, null, null};
     // for islands only report location
     static MapLocation[] islandLocations = new MapLocation[GameConstants.MAX_NUMBER_ISLANDS + 1];
@@ -392,7 +392,7 @@ public class Carrier extends Unit {
         if (!rc.isMovementReady()) {
             return;
         }
-        FastIterableLocSet minableLocs = MapRecorder.getMinableSquares(miningWellLoc);
+        FastIterableLocSet minableLocs = MapRecorder.getMinableSquares(miningWellLoc, miningResourceType);
         minableLocs.updateIterable();
         // sense if there are teammates next to me that I need to let in
         boolean teammateAdjacent = false;
@@ -426,13 +426,25 @@ public class Carrier extends Unit {
             collect();
         } else { // moving toward mine
             // switch mine if original too congested
-            if (rc.senseNearbyRobots(miningWellLoc, 3, myTeam).length >= MapRecorder.getMinableSquares(miningWellLoc).size - 1) {
+
+            FastIterableLocSet minableSquares = MapRecorder.getMinableSquares(miningWellLoc, miningResourceType);
+            minableSquares.updateIterable();
+
+            int occupied = 0;
+            for (int i = minableSquares.size; --i >= 0;) {
+                MapLocation loc = minableSquares.locs[i];
+                if (rc.canSenseLocation(loc) && rc.senseRobotAtLocation(loc) != null) {
+                    occupied++;
+                }
+            }
+            if (occupied >= minableSquares.size) {
                 indicator += "congest";
                 congestedMines.add(miningWellLoc);
                 if (!resumeWork()) {
                     return;
                 }
             }
+
             moveToward(miningWellLoc);
             moveToward(miningWellLoc);
             if (rc.getLocation().isAdjacentTo(miningWellLoc)) {

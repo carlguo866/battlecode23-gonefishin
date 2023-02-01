@@ -190,7 +190,10 @@ public class MapRecorder extends RobotPlayer {
             if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
                 continue;
             }
-            vals[x * mapHeight + y] = WITHIN_HQ_RANGE;
+            char val = vals[x * mapHeight + y];
+            if ((val & SEEN_BIT) == 0 || (val & PASSIABLE_BIT) != 0) {
+                vals[x * mapHeight + y] = WITHIN_HQ_RANGE;
+            }
         }
         vals[hqX * mapHeight + hqY] = SEEN_BIT;
     }

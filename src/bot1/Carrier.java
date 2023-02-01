@@ -149,6 +149,9 @@ public class Carrier extends Unit {
             if (state == MINING || state == DROPPING_RESOURCE) {
                 lastEnemyOnMine.remove(miningWellLoc);
                 lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
+            } else if (state == ANCHORING) { // reset anchoring target
+                targetLoc = null;
+                targetIslandIndex = 0;
             }
             // try preserve the resource, unless too close, TODO if against a wall maybe just attack
             state = RUNAWAY;
@@ -192,16 +195,17 @@ public class Carrier extends Unit {
         int[] islands = rc.senseNearbyIslands();
         int dis = targetLoc == null? Integer.MAX_VALUE : targetLoc.distanceSquaredTo(rc.getLocation());
         for (int island : islands) {
-            if (rc.senseTeamOccupyingIsland(island) != Team.NEUTRAL) {
+            if (rc.senseTeamOccupyingIsland(island) == myTeam) {
                 if (island == targetIslandIndex) {
                     // the original target is not placable anymore
-                    if (Comm.getIslandStatus(island) == Comm.ISLAND_NEUTRAL) {
-                        ignoredIslands.add(island);
-                    }
+                    ignoredIslands.add(island);
                     targetIslandIndex = -1;
                     targetLoc = null;
                 }
                 continue; // we can't place here
+            }
+            if (island == targetIslandIndex) {
+                break; // our target is correct, just go there, don't change move target
             }
             MapLocation locs[] = rc.senseNearbyIslandLocations(island);
             for (MapLocation loc : locs) {
@@ -215,15 +219,21 @@ public class Carrier extends Unit {
 
         // otherwise try to find target from Comm
         if (targetLoc == null) {
+            boolean targetNeutral = false;
+            int targetDis = Integer.MAX_VALUE;
             for (int i = 1; i <= islandCount; i++) {
                 if (ignoredIslands.contains(i)) {
                     continue;
                 }
                 MapLocation islandLocation = Comm.getIslandLocation(i);
-                if (islandLocation != null && Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL) {
+                if (islandLocation != null) {
+                    boolean neutral = Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL;
                     int islandDis = islandLocation.distanceSquaredTo(rc.getLocation());
-                    if (islandDis < dis) {
+                    if (targetLoc == null
+                            || (!targetNeutral && neutral)
+                            || (targetNeutral == neutral && targetDis > dis)) {
                         dis = islandDis;
+                        targetNeutral = neutral;
                         targetLoc = islandLocation;
                         targetIslandIndex = i;
                     }

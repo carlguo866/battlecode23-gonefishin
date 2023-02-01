@@ -288,8 +288,6 @@ public class Unit extends RobotPlayer {
             Direction moveDir = pathingCnt_ == 0? prv_[pathingCnt_] : prv_[pathingCnt_ - 1].rotateRight();
             now = now.add(moveDir);
         }
-        System.out.println(moveLeft);
-        System.out.println(moveRight);
         MapLocation rightend = now;
         //find best direction
         if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return ret;

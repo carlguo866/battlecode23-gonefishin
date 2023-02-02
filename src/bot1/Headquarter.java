@@ -16,11 +16,13 @@ public class Headquarter extends Unit {
     public static boolean isCongested = false;
 
     private static RobotInfo closestEnemy;
-    private static int enemyCount = 0;
+    private static int strength;
     private static int friendlyCount = 0;
     private static int spawnableTileOccupied = 0;
     private static boolean canBuildCarrier, canBuildLauncher;
     private static int usableMN, usableAD, usableEL;
+
+    private static MapLocation curLoc = rc.getLocation();
 
     public static void run() throws GameActionException {
         if (turnCount == 0) {
@@ -99,11 +101,24 @@ public class Headquarter extends Unit {
 
     private static void tryBuildLauncher() throws GameActionException {
         int maxLauncherSpawn = Math.min(5, usableMN / Constants.LAUNCHER_COST_MN);
-        if (canBuildLauncher && (maxLauncherSpawn > enemyCount || turnCount == 0)) {
+        if (canBuildLauncher && (maxLauncherSpawn * Launcher.MAX_HEALTH + strength >= 0 || turnCount == 0)) {
             // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
-            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+            MapLocation spawnLoc;
+            if (closestEnemy != null) {
+                Direction dir2e = curLoc.directionTo(closestEnemy.location);
+                spawnLoc = curLoc.subtract(dir2e).subtract(dir2e).subtract(dir2e).subtract(dir2e);
+            } else if (turnCount == 0) {
+                spawnLoc = new MapLocation(mapWidth / 2, mapHeight / 2);
+            } else {
+                spawnLoc = getClosestLoc(Comm.enemyHQLocations);
+            }
             for (int i = maxLauncherSpawn; --i >= 0 && rc.isActionReady();) {
-                trySpawn(RobotType.LAUNCHER, closestEnemyHQ);
+                MapLocation loc = trySpawn(RobotType.LAUNCHER, spawnLoc);
+                if (loc == null) {
+                    break;
+                } else if (i == maxLauncherSpawn - 1) {
+                    spawnLoc = loc;
+                }
             }
         }
     }
@@ -123,22 +138,30 @@ public class Headquarter extends Unit {
         closestEnemy = null;
         friendlyCount = 0;
         spawnableTileOccupied = 0;
-        enemyCount = 0;
+        strength = 0;
         int dis = Integer.MAX_VALUE;
         for (RobotInfo robot : rc.senseNearbyRobots(-1)) {
             if (robot.team == oppTeam) {
-                if (robot.type == RobotType.LAUNCHER) {
-                    enemyCount++;
-                    int newDis = rc.getLocation().distanceSquaredTo(robot.location);
-                    if (newDis < dis) {
-                        closestEnemy = robot;
-                        dis = newDis;
-                    }
+                switch (robot.type) {
+                    case LAUNCHER:
+                    case DESTABILIZER:
+                        lastEnemyRound = rc.getRoundNum();
+                        strength -= robot.health;
+                        int newDis = rc.getLocation().distanceSquaredTo(robot.location);
+                        if (newDis < dis) {
+                            closestEnemy = robot;
+                            dis = newDis;
+                        }
                 }
             } else {
                 friendlyCount++;
                 if (spawnableSet.contains(robot.location)) {
                     spawnableTileOccupied++;
+                }
+                switch (robot.type) {
+                    case LAUNCHER:
+                    case DESTABILIZER:
+                        strength += robot.health;
                 }
             }
         }
@@ -164,9 +187,11 @@ public class Headquarter extends Unit {
         }
     }
 
-    private static boolean trySpawn(RobotType robotType, MapLocation center) throws GameActionException {
+    private static MapLocation trySpawn(RobotType robotType, MapLocation center) throws GameActionException {
         MapLocation bestSpawn = null;
         for (int i = spawnableSet.size; --i >= 0;) {
+            if (turnCount == 0 && spawnableSet.locs[i].distanceSquaredTo(curLoc) == 9)
+                continue;
             if ((bestSpawn == null || spawnableSet.locs[i].distanceSquaredTo(center) < bestSpawn.distanceSquaredTo(center))
                     && rc.canBuildRobot(robotType, spawnableSet.locs[i])) {
                 bestSpawn = spawnableSet.locs[i];
@@ -174,9 +199,9 @@ public class Headquarter extends Unit {
         }
         if (bestSpawn == null) {
             System.out.printf("out of loc to build %s\n", robotType);
-            return false;
+            return null;
         }
         rc.buildRobot(robotType, bestSpawn);
-        return true;
+        return bestSpawn;
     }
 }

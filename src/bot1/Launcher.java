@@ -24,6 +24,7 @@ public class Launcher extends Unit {
     private static MapLocation anchoringCarrier = null;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
+    private static MapLocation homeHQLoc = null;
 
     // micro vars
     static RobotInfo attackTarget = null;
@@ -52,7 +53,8 @@ public class Launcher extends Unit {
             // prioritize the closest enemy HQ
             FastMath.initRand(rc);
             lastSym = Comm.symmetry;
-            enemyHQID = getClosestID(Comm.enemyHQLocations);
+            homeHQLoc = getClosestLoc(Comm.friendlyHQLocations);
+            enemyHQID = getClosestID(homeHQLoc, Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
         sense();
@@ -242,6 +244,7 @@ public class Launcher extends Unit {
         return false;
     }
 
+    // returns whether macro can move
     static void micro() throws GameActionException {
 //        indicator += String.format("a%s,b%s,c%s,ca%s,m%b",
 //                attackTarget == null? "" : attackTarget.location,

@@ -101,6 +101,7 @@ public class Headquarter extends Unit {
 
     private static void tryBuildLauncher() throws GameActionException {
         int maxLauncherSpawn = Math.min(5, usableMN / Constants.LAUNCHER_COST_MN);
+        double x = 0, y = 0;
         if (canBuildLauncher && (maxLauncherSpawn * Launcher.MAX_HEALTH + strength >= 0 || turnCount == 0)) {
             // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
             MapLocation spawnLoc;
@@ -112,13 +113,15 @@ public class Headquarter extends Unit {
             } else {
                 spawnLoc = getClosestLoc(Comm.enemyHQLocations);
             }
-            for (int i = maxLauncherSpawn; --i >= 0 && rc.isActionReady();) {
-                MapLocation loc = trySpawn(RobotType.LAUNCHER, spawnLoc);
-                if (loc == null) {
-                    break;
-                } else if (i == maxLauncherSpawn - 1) {
-                    spawnLoc = loc;
+            for (int i = 0; i < maxLauncherSpawn && rc.isActionReady(); i++) {
+                MapLocation loc;
+                if (i == 0) {
+                    loc = trySpawn(RobotType.LAUNCHER, spawnLoc.x, spawnLoc.y);
+                } else {
+                    loc = trySpawn(RobotType.LAUNCHER, x / i, y / i);
                 }
+                x += loc.x;
+                y += loc.y;
             }
         }
     }
@@ -128,7 +131,7 @@ public class Headquarter extends Unit {
         if (canBuildCarrier) {
             // do not spawn miner if enemies are close as miners getting killed will mess up spanw Q
             for (int i = maxCarrierSpawn; --i >= 0 && rc.isActionReady();) {
-                trySpawn(RobotType.CARRIER, rc.getLocation());
+                trySpawn(RobotType.CARRIER, curLoc.x, curLoc.y);
             }
         }
     }
@@ -187,14 +190,20 @@ public class Headquarter extends Unit {
         }
     }
 
-    private static MapLocation trySpawn(RobotType robotType, MapLocation center) throws GameActionException {
+    private static MapLocation trySpawn(RobotType robotType, double x, double y) throws GameActionException {
         MapLocation bestSpawn = null;
+        double bestDis = 1e6;
         for (int i = spawnableSet.size; --i >= 0;) {
             if (turnCount == 0 && spawnableSet.locs[i].distanceSquaredTo(curLoc) == 9)
                 continue;
-            if ((bestSpawn == null || spawnableSet.locs[i].distanceSquaredTo(center) < bestSpawn.distanceSquaredTo(center))
-                    && rc.canBuildRobot(robotType, spawnableSet.locs[i])) {
-                bestSpawn = spawnableSet.locs[i];
+            MapLocation loc = spawnableSet.locs[i];
+            double dis = Math.hypot(x - loc.x, y - loc.y);
+            if (dis + 1e-6 < bestDis && rc.canBuildRobot(robotType, loc)) {
+                bestSpawn = loc;
+                bestDis = dis;
+            } else if (Math.abs(dis - bestDis) < 1e-6 && Math.hypot(curLoc.x - bestSpawn.x, curLoc.y - bestSpawn.y) < Math.hypot(curLoc.x - loc.x, curLoc.y - loc.y)) {
+                bestSpawn = loc;
+                bestDis = dis;
             }
         }
         if (bestSpawn == null) {

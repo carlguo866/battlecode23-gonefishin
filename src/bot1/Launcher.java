@@ -12,6 +12,7 @@ public class Launcher extends Unit {
     public static final int DAMAGE = 20;
     public static final int ATTACK_DIS = 16;
     public static final int VISION_DIS = 20;
+    private static final int HEALING_CUTOFF = 121;
 
     private static final int ATTACKING = 1;
     private static final int HEALING = 2;
@@ -191,7 +192,7 @@ public class Launcher extends Unit {
     private static int islandTargetIndex = 0;
     static boolean tryIslandStuff() throws GameActionException {
         // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
-        boolean needHeal =  (rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < 100;
+        boolean needHeal =  (rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < HEALING_CUTOFF;
         if (state == HEALING && !needHeal) {
             islandTargetIndex = 0;
             islandTargetLoc = null;
@@ -279,7 +280,7 @@ public class Launcher extends Unit {
                 kite(cachedEnemyLocation);
             }
         }
-        if (Comm.getClosestFriendlyIslandIndex() != 0 && rc.getHealth() < 100) {
+        if (Comm.getClosestFriendlyIslandIndex() != 0 && rc.getHealth() < HEALING_CUTOFF) {
             // go back to heal if possible, no chasing
             return;
         }

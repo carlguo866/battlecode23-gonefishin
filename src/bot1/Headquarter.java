@@ -81,8 +81,8 @@ public class Headquarter extends Unit {
             shouldBuild = true;
 
         // allow for a single early anchor for healing
-        if (Comm.getClosestFriendlyIslandIndex() == 0 && rc.getRoundNum() > 180
-                && hqid == 0 && rc.getRobotCount() / Comm.numHQ > 18)
+        if (Comm.getClosestFriendlyIslandIndex() == 0 && rc.getRoundNum() > 150
+                && hqid == 0 && rc.getRobotCount() / Comm.numHQ > 15)
             shouldBuild = true;
 
         if (shouldBuild

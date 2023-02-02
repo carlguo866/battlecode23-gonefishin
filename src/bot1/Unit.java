@@ -100,7 +100,7 @@ public class Unit extends RobotPlayer {
 
     static void moveToward(MapLocation location) throws GameActionException {
         // reset queue when target location changes or there's gap in between calls
-        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 2) {
+        if (!location.equals(lastPathingTarget) || lastPathingTurn < turnCount - 3) {
             pathingCnt = 0;
             stuckCnt = 0;
         }

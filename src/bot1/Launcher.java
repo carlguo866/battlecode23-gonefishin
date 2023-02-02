@@ -148,7 +148,7 @@ public class Launcher extends Unit {
     static void macro() throws GameActionException {
         // Cow: only macro move in even turns
         // try return immediately after a move command, so if we stuck we won't overrun turns
-        if (!rc.isMovementReady() || rc.getRoundNum() % 2 == 0)
+        if (!rc.isMovementReady())
             return;
         if (Comm.needSymmetryReport && rc.getRoundNum() > 150 && rc.getID() % 8 == 0) {
             moveToward(getClosestLoc(Comm.friendlyHQLocations));

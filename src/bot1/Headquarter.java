@@ -120,6 +120,9 @@ public class Headquarter extends Unit {
                 } else {
                     loc = trySpawn(RobotType.LAUNCHER, x / i, y / i);
                 }
+                if (loc == null) {
+                    break;
+                }
                 x += loc.x;
                 y += loc.y;
             }

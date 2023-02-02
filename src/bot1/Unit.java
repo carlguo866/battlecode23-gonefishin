@@ -208,7 +208,7 @@ public class Unit extends RobotPlayer {
 
     private static final int BYTECODE_CUTOFF = 3000;
     static int getTurnDir(Direction direction, MapLocation target) throws GameActionException{
-        int ret = getCenterDir(direction);
+        //int ret = getCenterDir(direction);
         MapLocation now = rc.getLocation();
         int moveLeft = 0;
         int moveRight = 0;
@@ -227,12 +227,15 @@ public class Unit extends RobotPlayer {
 
         int byteCodeRem = Clock.getBytecodesLeft();
         if (byteCodeRem < BYTECODE_CUTOFF)
-            return ret;
+            return Constants.rng.nextInt(2);
         //simulate turning left
         while (pathingCnt_ > 0) {
             moveLeft++;
-            if (moveLeft > MAX_DEPTH || Clock.getBytecodesLeft() < (byteCodeRem + BYTECODE_CUTOFF) / 2) {
-                moveLeft = MAX_DEPTH + 1;
+            if (moveLeft > MAX_DEPTH) {
+                break;
+            }
+            if (Clock.getBytecodesLeft() < BYTECODE_CUTOFF) {
+                moveLeft = -1;
                 break;
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
@@ -242,6 +245,7 @@ public class Unit extends RobotPlayer {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
                 pathingCnt_++;
                 if (pathingCnt_ > 8) {
+                    moveLeft = -1;
                     break;
                 }
             }
@@ -268,8 +272,11 @@ public class Unit extends RobotPlayer {
         
         while (pathingCnt_ > 0) {
             moveRight++;
-            if (moveRight > MAX_DEPTH || Clock.getBytecodesLeft() < BYTECODE_CUTOFF) {
-                moveRight = MAX_DEPTH + 1;
+            if (moveRight > MAX_DEPTH) {
+                break;
+            }
+            if (Clock.getBytecodesLeft() < BYTECODE_CUTOFF) {
+                moveRight = -1;
                 break;
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
@@ -279,6 +286,7 @@ public class Unit extends RobotPlayer {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();
                 pathingCnt_++;
                 if (pathingCnt_ > 8) {
+                    moveRight = -1;
                     break;
                 }
             }
@@ -290,13 +298,14 @@ public class Unit extends RobotPlayer {
         }
         MapLocation rightend = now;
         //find best direction
-        if (moveLeft > MAX_DEPTH && moveRight > MAX_DEPTH) return ret;
+        if (moveLeft == -1 || moveRight == -1) return Constants.rng.nextInt(2);
         if (moveLeft + getSteps(leftend, target) <= moveRight + getSteps(rightend, target)) return 0;
         else return 1;
         
     }
 
     static boolean canPass(MapLocation loc, Direction targetDir) throws GameActionException {
+        if (loc.x == rc.getLocation().x && loc.y == rc.getLocation().y) return true;
         if (!MapRecorder.check(loc, targetDir)) return false;
         /*
         if (getClosestDis(loc, Comm.enemyHQLocations) <= 9) {
@@ -305,8 +314,9 @@ public class Unit extends RobotPlayer {
         */
         if (!rc.canSenseLocation(loc)) return true;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
-        if (robot != null)
-            return false; 
+        if (robot != null && (rc.getNumAnchors(Anchor.STANDARD) == 0 || robot.type == RobotType.HEADQUARTERS))
+            if (Constants.rng.nextInt(4) != 0)
+                return false; 
         return true;
     }
 

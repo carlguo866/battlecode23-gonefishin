@@ -16,11 +16,13 @@ public class Headquarter extends Unit {
     public static boolean isCongested = false;
 
     private static RobotInfo closestEnemy;
-    private static int enemyCount = 0;
+    private static int strength;
     private static int friendlyCount = 0;
     private static int spawnableTileOccupied = 0;
     private static boolean canBuildCarrier, canBuildLauncher;
     private static int usableMN, usableAD, usableEL;
+
+    private static MapLocation curLoc = rc.getLocation();
 
     public static void run() throws GameActionException {
         if (turnCount == 0) {
@@ -99,11 +101,27 @@ public class Headquarter extends Unit {
 
     private static void tryBuildLauncher() throws GameActionException {
         int maxLauncherSpawn = Math.min(5, usableMN / Constants.LAUNCHER_COST_MN);
-        if (canBuildLauncher && (maxLauncherSpawn > enemyCount || turnCount == 0)) {
+        double x = 0, y = 0;
+        if (canBuildLauncher && (maxLauncherSpawn * Launcher.MAX_HEALTH + strength >= 0 || turnCount == 0)) {
             // only spawn launcher if can spawn more than enemies close by, or just save mana for tiebreaker lol
-            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
-            for (int i = maxLauncherSpawn; --i >= 0 && rc.isActionReady();) {
-                trySpawn(RobotType.LAUNCHER, closestEnemyHQ);
+            MapLocation spawnLoc;
+            if (closestEnemy != null) {
+                Direction dir2e = curLoc.directionTo(closestEnemy.location);
+                spawnLoc = curLoc.subtract(dir2e).subtract(dir2e).subtract(dir2e).subtract(dir2e);
+            } else if (turnCount == 0) {
+                spawnLoc = new MapLocation(mapWidth / 2, mapHeight / 2);
+            } else {
+                spawnLoc = getClosestLoc(Comm.enemyHQLocations);
+            }
+            for (int i = 0; i < maxLauncherSpawn && rc.isActionReady(); i++) {
+                MapLocation loc;
+                if (i == 0) {
+                    loc = trySpawn(RobotType.LAUNCHER, spawnLoc.x, spawnLoc.y);
+                } else {
+                    loc = trySpawn(RobotType.LAUNCHER, x / i, y / i);
+                }
+                x += loc.x;
+                y += loc.y;
             }
         }
     }
@@ -113,7 +131,7 @@ public class Headquarter extends Unit {
         if (canBuildCarrier) {
             // do not spawn miner if enemies are close as miners getting killed will mess up spanw Q
             for (int i = maxCarrierSpawn; --i >= 0 && rc.isActionReady();) {
-                trySpawn(RobotType.CARRIER, rc.getLocation());
+                trySpawn(RobotType.CARRIER, curLoc.x, curLoc.y);
             }
         }
     }
@@ -123,22 +141,30 @@ public class Headquarter extends Unit {
         closestEnemy = null;
         friendlyCount = 0;
         spawnableTileOccupied = 0;
-        enemyCount = 0;
+        strength = 0;
         int dis = Integer.MAX_VALUE;
         for (RobotInfo robot : rc.senseNearbyRobots(-1)) {
             if (robot.team == oppTeam) {
-                if (robot.type == RobotType.LAUNCHER) {
-                    enemyCount++;
-                    int newDis = rc.getLocation().distanceSquaredTo(robot.location);
-                    if (newDis < dis) {
-                        closestEnemy = robot;
-                        dis = newDis;
-                    }
+                switch (robot.type) {
+                    case LAUNCHER:
+                    case DESTABILIZER:
+                        lastEnemyRound = rc.getRoundNum();
+                        strength -= robot.health;
+                        int newDis = rc.getLocation().distanceSquaredTo(robot.location);
+                        if (newDis < dis) {
+                            closestEnemy = robot;
+                            dis = newDis;
+                        }
                 }
             } else {
                 friendlyCount++;
                 if (spawnableSet.contains(robot.location)) {
                     spawnableTileOccupied++;
+                }
+                switch (robot.type) {
+                    case LAUNCHER:
+                    case DESTABILIZER:
+                        strength += robot.health;
                 }
             }
         }
@@ -164,19 +190,27 @@ public class Headquarter extends Unit {
         }
     }
 
-    private static boolean trySpawn(RobotType robotType, MapLocation center) throws GameActionException {
+    private static MapLocation trySpawn(RobotType robotType, double x, double y) throws GameActionException {
         MapLocation bestSpawn = null;
+        double bestDis = 1e6;
         for (int i = spawnableSet.size; --i >= 0;) {
-            if ((bestSpawn == null || spawnableSet.locs[i].distanceSquaredTo(center) < bestSpawn.distanceSquaredTo(center))
-                    && rc.canBuildRobot(robotType, spawnableSet.locs[i])) {
-                bestSpawn = spawnableSet.locs[i];
+            if (turnCount == 0 && spawnableSet.locs[i].distanceSquaredTo(curLoc) == 9)
+                continue;
+            MapLocation loc = spawnableSet.locs[i];
+            double dis = Math.hypot(x - loc.x, y - loc.y);
+            if (dis + 1e-6 < bestDis && rc.canBuildRobot(robotType, loc)) {
+                bestSpawn = loc;
+                bestDis = dis;
+            } else if (Math.abs(dis - bestDis) < 1e-6 && Math.hypot(curLoc.x - bestSpawn.x, curLoc.y - bestSpawn.y) < Math.hypot(curLoc.x - loc.x, curLoc.y - loc.y)) {
+                bestSpawn = loc;
+                bestDis = dis;
             }
         }
         if (bestSpawn == null) {
             System.out.printf("out of loc to build %s\n", robotType);
-            return false;
+            return null;
         }
         rc.buildRobot(robotType, bestSpawn);
-        return true;
+        return bestSpawn;
     }
 }

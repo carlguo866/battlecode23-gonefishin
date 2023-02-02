@@ -1,4 +1,4 @@
-package new_launcher.util;
+package bot1.util;
 
 /**
  * Interface to represent ints up to 65535 (2^16-1)

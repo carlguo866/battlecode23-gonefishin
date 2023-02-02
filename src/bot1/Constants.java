@@ -11,6 +11,8 @@ public class Constants {
     public static final int CARRIER_COST_AD = 50;
     public static final int CARRIER_ATTACK_DIS = 9;
 
+    public static final int DESTABLIZER_COST_EL = 200;
+
     public static final int AMP_COST_AD = 30;
     public static final int AMP_COST_MN = 15;
 

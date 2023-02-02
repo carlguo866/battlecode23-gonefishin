@@ -61,7 +61,9 @@ public class Headquarter extends Unit {
         if (rc.getRoundNum() - lastEnemyRound <= 5 || Comm.isCongested()) {
             canBuildCarrier = false;
         }
+
         tryBuildAnchor();
+        tryBuildDestablizer();
         tryBuildLauncher();
         tryBuildCarrier();
 
@@ -94,6 +96,13 @@ public class Headquarter extends Unit {
                 rc.buildAnchor(Anchor.STANDARD);
                 lastRoundAnchorBuilt = rc.getRoundNum();
             }
+        }
+    }
+
+    private static void tryBuildDestablizer() throws GameActionException {
+        if (usableEL > Constants.DESTABLIZER_COST_EL) {
+            MapLocation closestEnemyHQ = getClosestLoc(Comm.enemyHQLocations);
+            trySpawn(RobotType.DESTABILIZER, closestEnemyHQ);
         }
     }
 

@@ -51,9 +51,9 @@ public strictfp class RobotPlayer {
                     case HEADQUARTERS: Headquarter.run();  break;
                     case CARRIER: Carrier.run();  break;
                     case LAUNCHER: Launcher.run(); break;
+                    case DESTABILIZER: Destabilizer.run(); break;
                     case AMPLIFIER:
                     case BOOSTER:
-                    case DESTABILIZER:  break;
                 }
                 rc.setIndicatorString(indicator);
             } catch (GameActionException e) {

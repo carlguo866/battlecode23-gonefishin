@@ -36,7 +36,7 @@ public class Carrier extends Unit {
     public static int lastEnemyRound = 0;
     public static RobotInfo closestEnemy = null;
 
-    public static FastIterableLocSet congestedMines = new FastIterableLocSet(290);
+    public static FastIterableLocSet congestedMines = new FastIterableLocSet(30);
     public static FastLocIntMap lastEnemyOnMine = new FastLocIntMap();
     private static Random rng;
 
@@ -47,8 +47,8 @@ public class Carrier extends Unit {
     static MapLocation scoutTarget = null;
     static MapLocation scoutCenter = null;
     static double scoutAngle = 0;
-    public static FastIterableLocSet[] wellsSeen = {null, null, null};
-    static FastIterableLocSet[] wellsToReport = {null, null, null};
+    public static FastIterableLocSet[] wellsSeen = {null, null, null, null};
+    static FastIterableLocSet[] wellsToReport = {null, null, null, null};
     // for islands only report location
     static MapLocation[] islandLocations = new MapLocation[GameConstants.MAX_NUMBER_ISLANDS + 1];
     static int[] islandsToReport = new int[GameConstants.MAX_NUMBER_ISLANDS];
@@ -56,10 +56,12 @@ public class Carrier extends Unit {
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
-            wellsSeen[ResourceType.MANA.resourceID] = new FastIterableLocSet(145);
-            wellsSeen[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(145);
+            wellsSeen[ResourceType.MANA.resourceID] = new FastIterableLocSet(15);
+            wellsSeen[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(15);
+            wellsSeen[ResourceType.ELIXIR.resourceID] = new FastIterableLocSet(5);
             wellsToReport[ResourceType.MANA.resourceID] = new FastIterableLocSet(10);
             wellsToReport[ResourceType.ADAMANTIUM.resourceID] = new FastIterableLocSet(10);
+            wellsToReport[ResourceType.ELIXIR.resourceID] = new FastIterableLocSet(5);
 
             if (rc.canWriteSharedArray(0, 0)) {
                 report(); // to get the carrier ID
@@ -463,6 +465,26 @@ public class Carrier extends Unit {
     private static void dropResource() throws GameActionException {
         int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
         int mn = rc.getResourceAmount(ResourceType.MANA);
+        int el = rc.getResourceAmount(ResourceType.ELIXIR);
+        // upgrade logic
+        if (Comm.isCongested() && ad == GameConstants.CARRIER_CAPACITY) {
+            wellsSeen[ResourceType.MANA.resourceID].updateIterable();
+            MapLocation closestMNWell = getClosestLoc(miningHQLoc, wellsSeen[ResourceType.MANA.resourceID].locs);
+            do {
+                if (wellsSeen[ResourceType.ELIXIR.resourceID].contains(closestMNWell)) {
+                    break;
+                }
+                if (rc.getLocation().isAdjacentTo(closestMNWell)) {
+                    if (rc.canTransferResource(closestMNWell, ResourceType.ADAMANTIUM, ad)) {
+                        rc.transferResource(closestMNWell, ResourceType.ADAMANTIUM, ad);
+                        break;
+                    }
+                } else {
+                    moveToward(closestMNWell);
+                    return;
+                }
+            } while (false);
+        }
         if (!rc.getLocation().isAdjacentTo(miningHQLoc)) {
             moveToward(miningHQLoc);
         }
@@ -471,12 +493,14 @@ public class Carrier extends Unit {
                 rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
             } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
                 rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
+            } else if (rc.canTransferResource(miningHQLoc, ResourceType.ELIXIR, el)) {
+                rc.transferResource(miningHQLoc, ResourceType.ELIXIR, el);
             }
-            if (rc.getWeight() == 0) {
-                congestedMines.clear();
-                if (resumeWork()) {
-                    handleMiningState();
-                }
+        }
+        if (rc.getWeight() == 0) {
+            congestedMines.clear();
+            if (resumeWork()) {
+                handleMiningState();
             }
         }
     }

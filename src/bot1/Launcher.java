@@ -51,7 +51,6 @@ public class Launcher extends Unit {
         if (turnCount == 0) {
             // future: get from spawn queue if there are more than one roles
             // prioritize the closest enemy HQ
-            FastMath.initRand(rc);
             lastSym = Comm.symmetry;
             homeHQLoc = getClosestLoc(Comm.friendlyHQLocations);
             enemyHQID = getClosestID(homeHQLoc, Comm.enemyHQLocations);

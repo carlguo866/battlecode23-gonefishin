@@ -1,6 +1,7 @@
 package bot1;
 
 import battlecode.common.*;
+import bot1.util.FastMath;
 
 
 /**
@@ -39,6 +40,7 @@ public strictfp class RobotPlayer {
         mapHeight = rc.getMapHeight();
         islandCount = rc.getIslandCount();
         turnCount = 0;
+        FastMath.initRand(rc);
 
         while (true) {
 

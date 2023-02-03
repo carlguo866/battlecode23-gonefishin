@@ -3,9 +3,7 @@ package bot1;
 import battlecode.common.*;
 
 public class Amplifier extends Unit {
-    /*
-    public static final int MASTER_ID = 4;
-    public static int ampid = MASTER_ID;
+    public static int ampid = 4;
 
     private static int strength;
     private static MapLocation closestEnemy;
@@ -14,31 +12,41 @@ public class Amplifier extends Unit {
     private static MapLocation anchorTargetLoc;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
-    private static boolean onTheWay = true; // meaning the amp is just spawned, won't send any command
-
-    private static int anchoringRound = 0;
-    private static int anchoringIsland = 0;
 
     public static void run() throws GameActionException {
         if (turnCount == 0) {
             enemyHQID = getClosestID(Comm.enemyHQLocations);
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
-            // find the closest HQ that doesn't have a amp, if all HQs have amp, I am master
+            // find the closest HQ that doesn't have a amp
             for (int i = Comm.numHQ; --i >= 0;) {
-                if (Comm.getTargetLocation(i) == null && (
-                        ampid == MASTER_ID ||
-                        Comm.friendlyHQLocations[i].distanceSquaredTo(rc.getLocation())
-                                < Comm.friendlyHQLocations[ampid].distanceSquaredTo(rc.getLocation()))) {
+                if (!Comm.isAmpAlive(i) && (ampid == 4
+                        || Comm.friendlyHQLocations[i].distanceSquaredTo(rc.getLocation())
+                        < Comm.friendlyHQLocations[ampid].distanceSquaredTo(rc.getLocation()))) {
                     ampid = i;
                 }
+            }
+            if (ampid == 4) {
+                System.out.println("bug: all amp id taken");
+                ampid = 0;
             }
         }
 
         sense();
+        MapLocation commEnemy = Comm.updateEnemy();
+        if (closestEnemy == null)
+            closestEnemy = commEnemy;
         indicator += String.format("amp%d,strength%d,", ampid, strength);
 
         if (rc.isMovementReady()) {
             if (closestEnemy == null && centerOfFriend == null) {
+                if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
+                    for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
+                        if (Comm.enemyHQLocations[i % 4] != null) {
+                            enemyHQID = i % 4;
+                            break;
+                        }
+                    }
+                }
                 moveToward(enemyHQLoc);
             } else {
                 Direction bestMoveDir = null;
@@ -61,10 +69,6 @@ public class Amplifier extends Unit {
             }
         }
 
-        if (closestEnemy != null) {
-            onTheWay = false;
-        }
-
         int [] islandIndexes = rc.senseNearbyIslands();
         for (int i = islandIndexes.length; --i >=0; ) {
             int islandIndex = islandIndexes[i];
@@ -79,44 +83,9 @@ public class Amplifier extends Unit {
             } else if (occupyingTeam == oppTeam) {
                 islandState = Comm.ISLAND_ENEMY;
             }
-            // decide whether to report this island for anchoring
-            if (islandState == Comm.ISLAND_NEUTRAL
-                    && !onTheWay
-                    && strength >= 600
-                    && anchoringIsland == 0
-                    && Comm.getAnchorTarget() == 0
-                    && rc.getRoundNum() - anchoringRound > 70
-                    && rc.getRobotCount() / Comm.numHQ > 15 && Comm.getCarrierCnt() / Comm.numHQ > 5
-                    && getClosestDis(centerOfFriend, rc.senseNearbyIslandLocations(islandIndex)) <= 9) {
-                System.out.printf("anchoring %d\n", islandIndex);
-                anchoringIsland = islandIndex;
-                anchoringRound = rc.getRoundNum();
-                anchorTargetLoc = islandLoc;
-                Comm.setAnchorTarget(anchoringIsland);
-            }
-            if (anchoringIsland == islandIndex && islandState == Comm.ISLAND_ENEMY) {
-                Comm.setAnchorTarget(0);
-                anchoringIsland = 0;
-                System.out.printf("give up island %d due to enemy\n", anchoringIsland);
-            }
             Comm.reportIsland(islandLoc, islandIndex, islandState);
         }
-
-        if (anchoringIsland != 0 && Comm.getIslandStatus(anchoringIsland) == Comm.ISLAND_FRIENDLY) {
-            System.out.printf("%d anchored\n", anchoringIsland);
-            anchoringIsland = 0;
-            anchorTargetLoc = null;
-        }
-
-        if (anchoringIsland != 0 && closestEnemy != null && closestEnemy.distanceSquaredTo(anchorTargetLoc) <= 16) {
-            System.out.printf("give up island %d due to enemy\n", anchoringIsland);
-            anchorTargetLoc = null;
-            anchoringIsland = 0;
-            Comm.setAnchorTarget(0);
-        }
-
-        indicator += String.format("target %s,anchor %d,Comm target %s", anchorTargetLoc, anchoringIsland, Comm.getAnchorTarget());
-        Comm.amplifierUpdate(ampid, null);
+        Comm.amplifierUpdate(ampid);
         Comm.commit_write();
         MapRecorder.recordSym(500);
     }
@@ -157,6 +126,8 @@ public class Amplifier extends Unit {
                             robot.location.distanceSquaredTo(currentLoc) < closestEnemy.distanceSquaredTo(currentLoc)) {
                         closestEnemy = robot.location;
                     }
+                } else if (robot.type == RobotType.HEADQUARTERS) {
+                    MapRecorder.reportEnemyHQ(robot.location);
                 }
             } else {
                 if (robot.type == RobotType.LAUNCHER) {
@@ -169,5 +140,4 @@ public class Amplifier extends Unit {
         }
         centerOfFriend = cnt == 0? null : new MapLocation(x / cnt, y / cnt);
     }
-     */
 }

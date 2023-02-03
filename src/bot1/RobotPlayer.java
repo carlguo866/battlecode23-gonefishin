@@ -53,7 +53,7 @@ public strictfp class RobotPlayer {
                     case HEADQUARTERS: Headquarter.run();  break;
                     case CARRIER: Carrier.run();  break;
                     case LAUNCHER: Launcher.run(); break;
-                    case AMPLIFIER:
+                    case AMPLIFIER: Amplifier.run(); break;
                     case BOOSTER:
                     case DESTABILIZER:  break;
                 }

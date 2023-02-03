@@ -214,6 +214,24 @@ public class Comm extends RobotPlayer {
         writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, 0);
     }
 
+    // Amps: only used for island status report and alive check for now
+    public static final int AMPLIFIER_LEN = 3;
+    public static void amplifierUpdate(int index) throws GameActionException {
+        writeBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index, AMPLIFIER_LEN, 4 + rc.getRoundNum() % 4);
+    }
+    public static void cleanupAmplifier() {
+        for (int i = 4; --i >=0;) {
+            int val = readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * i, AMPLIFIER_LEN);
+            if(val != 0 && Math.abs((val & 0x3) - (rc.getRoundNum() & 0x3)) == 2) {
+                System.out.printf("Amp %d dead?, reset\n", i);
+                writeBits(AMPLIFIER_BIT + AMPLIFIER_LEN * i, AMPLIFIER_LEN, 0);
+            }
+        }
+    }
+    public static boolean isAmpAlive(int index) {
+        return readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index, AMPLIFIER_LEN) > 0;
+    }
+
     // enemy report
     // encoding 2 bit of round + 12 bit of loc
     private static final int ENEMY_LEN = 10;

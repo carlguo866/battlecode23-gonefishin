@@ -36,6 +36,7 @@ public class Headquarter extends Unit {
         }
         if (hqid == 0) {
             Comm.updateExpiredEnemy();
+            Comm.cleanupAmplifier();
         }
         Comm.updateEnemy();
         if (rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ == 0 && hqid == 0) {
@@ -71,6 +72,7 @@ public class Headquarter extends Unit {
             canBuildCarrier = false;
         }
         tryBuildAnchor();
+        tryBuildAmp();
         tryBuildLauncher();
         tryBuildCarrier();
 
@@ -110,6 +112,22 @@ public class Headquarter extends Unit {
             if (rc.canBuildAnchor(Anchor.STANDARD)) {
                 rc.buildAnchor(Anchor.STANDARD);
                 lastRoundAnchorBuilt = rc.getRoundNum();
+            }
+        }
+    }
+
+    private static int lastAmpRound = -100;
+    private static void tryBuildAmp() throws GameActionException {
+        if (rc.getRoundNum() > 200
+                && hqid % 2 == 0
+                && rc.getRoundNum() - lastAmpRound > 200
+                && !Comm.isAmpAlive(hqid)
+                && rc.getRoundNum() - lastEnemyRound > 20) {
+            usableAD -= Constants.AMP_COST_AD;
+            usableMN -= Constants.AMP_COST_MN;
+            if (usableAD >= 0 && usableMN >= 0) {
+                trySpawn(RobotType.AMPLIFIER, mapWidth / 2.0, mapHeight / 2.0);
+                lastAmpRound = rc.getRoundNum();
             }
         }
     }

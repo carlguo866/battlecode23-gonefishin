@@ -10,7 +10,7 @@ public class Headquarter extends Unit {
     public static int sensablePassibleArea = 0; // set by MapRecorder.hqInit()
     public static int hqid;
 
-    public static int lastRoundAnchorBuilt = 0;
+    public static int lastRoundAnchorBuilt = -1000;
     public static int lastCongestedRound = -100;
     public static int lastEnemyRound = -100;
     public static boolean isCongested = false;

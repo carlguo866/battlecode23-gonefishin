@@ -292,6 +292,7 @@ public class Launcher extends Unit {
             if (target == attackTarget) {
                 lastLauncherAttackRound = rc.getRoundNum();
             }
+            Unit.disableTurnDirRound = rc.getRoundNum() + 40;
             RobotInfo deadTarget = null;
             if (rc.canAttack(target.location)) {
                 cachedRound = rc.getRoundNum();

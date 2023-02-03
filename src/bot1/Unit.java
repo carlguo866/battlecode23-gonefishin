@@ -89,7 +89,7 @@ public class Unit extends RobotPlayer {
     private static int stuckCnt = 0;
     private static int lastPathingTurn = 0;
     private static int currentTurnDir = FastMath.rand256() % 2;
-    private static int disableTurnDirRound = 0;
+    public static int disableTurnDirRound = 0;
 
     private static Direction[] prv_ = new Direction[PRV_LENGTH];
     private static int pathingCnt_ = 0;
@@ -175,12 +175,18 @@ public class Unit extends RobotPlayer {
                 }
             } else {
                 //update stack of past directions, move to next available direction
+                if (pathingCnt > 1 && canPass(prv[pathingCnt - 2])) {
+                    pathingCnt -= 2;
+                }
                 while (pathingCnt > 0 && canPass(prv[pathingCnt - 1])) {
 //                    rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(prv[pathingCnt - 1]), 0, 255, 0);
                     pathingCnt--;
                 }
-                if (pathingCnt > 1 && canPass(prv[pathingCnt - 2])) {
-                    pathingCnt -= 2;
+                if (pathingCnt == 0) {
+                    Direction dir = rc.getLocation().directionTo(location);
+                    if (!canPass(dir)) {
+                        prv[pathingCnt++] = dir;
+                    }
                 }
                 int pathingCntCutOff = Math.min(PRV_LENGTH, pathingCnt + 8); // if 8 then all dirs blocked
                 while (pathingCnt > 0 && !canPass(currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight())) {

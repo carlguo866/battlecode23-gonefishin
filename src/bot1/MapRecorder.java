@@ -32,6 +32,24 @@ public class MapRecorder extends RobotPlayer {
         }
     }
 
+    public static boolean check1(MapLocation loc, Direction targetDir) throws GameActionException {
+        if (!rc.onTheMap(loc))
+            return false;
+        int val = vals[loc.x * mapHeight + loc.y];
+        if ((val & SEEN_BIT) == 0)
+            return true;
+        if ((val & PASSIABLE_BIT) == 0)
+            return false;
+        if (rc.getType() == RobotType.CARRIER && rc.getWeight() <= 12) {
+            return true;
+        }
+        Direction current = Direction.values()[val & CURRENT_MASK];
+        if (rc.getType() == RobotType.LAUNCHER){
+            return ((val & CLOUD_BIT) == 0 && current == Direction.CENTER);
+        }
+        return (current == targetDir || current == targetDir.rotateLeft() || current == targetDir.rotateRight() || current == Direction.CENTER);
+    }
+
     public static void recordSym(int leaveBytecodeCnt) throws GameActionException {
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {

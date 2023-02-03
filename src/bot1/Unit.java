@@ -141,12 +141,26 @@ public class Unit extends RobotPlayer {
                 boolean dirRightCanPass = canPass(dir.rotateRight(), dir);
                 boolean dirLeftCanPass = canPass(dir.rotateLeft(), dir);
                 if (dirCanPass || dirRightCanPass || dirLeftCanPass) {
-                    if (dirCanPass && rc.canMove(dir)) {
-                        rc.move(dir);
-                    } else if (dirRightCanPass && rc.canMove(dir.rotateRight())) {
-                        rc.move(dir.rotateRight());
-                    } else if (dirLeftCanPass && rc.canMove(dir.rotateLeft())) {
-                        rc.move(dir.rotateLeft());
+                    boolean dirCanPass1 = canPass1(dir, dir);
+                    boolean dirRightCanPass1 = canPass1(dir.rotateRight(), dir);
+                    boolean dirLeftCanPass1 = canPass1(dir.rotateLeft(), dir);
+                    if (dirCanPass1 || dirRightCanPass1 || dirLeftCanPass1) {
+                        if (dirCanPass1 && rc.canMove(dir)) {
+                            rc.move(dir);
+                        } else if (dirRightCanPass1 && rc.canMove(dir.rotateRight())) {
+                            rc.move(dir.rotateRight());
+                        } else if (dirLeftCanPass1 && rc.canMove(dir.rotateLeft())) {
+                            rc.move(dir.rotateLeft());
+                        }
+                    }
+                    else {
+                        if (dirCanPass && rc.canMove(dir)) {
+                            rc.move(dir);
+                        } else if (dirRightCanPass && rc.canMove(dir.rotateRight())) {
+                            rc.move(dir.rotateRight());
+                        } else if (dirLeftCanPass && rc.canMove(dir.rotateLeft())) {
+                            rc.move(dir.rotateLeft());
+                        }
                     }
                 } else {
                     //encounters obstacle; run simulation to determine best way to go
@@ -350,6 +364,16 @@ public class Unit extends RobotPlayer {
     static boolean canPass(Direction dir, Direction targetDir) throws GameActionException {
         MapLocation loc = rc.getLocation().add(dir);
         if (!MapRecorder.check(loc, targetDir)) return false;
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        // anchoring carriers don't yield to other robots
+        if (robot == null)
+            return true;
+        return FastMath.rand256() % 4 == 0; // Does rng help here? Each rng is 10 bytecode btw
+    }
+
+    static boolean canPass1(Direction dir, Direction targetDir) throws GameActionException {
+        MapLocation loc = rc.getLocation().add(dir);
+        if (!MapRecorder.check1(loc, targetDir)) return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         // anchoring carriers don't yield to other robots
         if (robot == null)

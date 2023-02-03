@@ -179,6 +179,9 @@ public class Unit extends RobotPlayer {
 //                    rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(prv[pathingCnt - 1]), 0, 255, 0);
                     pathingCnt--;
                 }
+                if (pathingCnt > 1 && canPass(prv[pathingCnt - 2])) {
+                    pathingCnt -= 2;
+                }
                 int pathingCntCutOff = Math.min(PRV_LENGTH, pathingCnt + 8); // if 8 then all dirs blocked
                 while (pathingCnt > 0 && !canPass(currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight())) {
                     prv[pathingCnt] = currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight();
@@ -264,6 +267,9 @@ public class Unit extends RobotPlayer {
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
                 pathingCnt_--;
             }
+            if (pathingCnt_ > 1 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 2])) {
+                pathingCnt_-=2;
+            }
             while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateLeft()), prv_[pathingCnt_ - 1].rotateLeft())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateLeft();
                 pathingCnt_++;
@@ -304,6 +310,9 @@ public class Unit extends RobotPlayer {
             }
             while (pathingCnt_ > 0 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 1])) {
                 pathingCnt_--;
+            }
+            if (pathingCnt_ > 1 && canPass(now.add(prv_[pathingCnt_ - 1]), prv_[pathingCnt_ - 2])) {
+                pathingCnt_-=2;
             }
             while (pathingCnt_ > 0 && !canPass(now.add(prv_[pathingCnt_ - 1].rotateRight()), prv_[pathingCnt_ - 1].rotateRight())) {
                 prv_[pathingCnt_] = prv_[pathingCnt_ - 1].rotateRight();

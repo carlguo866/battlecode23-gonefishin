@@ -9,7 +9,6 @@ public class Amplifier extends Unit {
     private static MapLocation closestEnemy;
     private static MapLocation centerOfFriend;
     private static MapLocation currentLoc;
-    private static MapLocation anchorTargetLoc;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
 
@@ -103,9 +102,6 @@ public class Amplifier extends Unit {
         }
         if (centerOfFriend != null) {
             score -= loc.distanceSquaredTo(centerOfFriend);
-        }
-        if (anchorTargetLoc != null) {
-            score -= loc.distanceSquaredTo(anchorTargetLoc) * 3;
         }
         return score;
     }

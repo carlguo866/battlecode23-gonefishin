@@ -269,11 +269,11 @@ public class Comm extends RobotPlayer {
                 MapLocation loc = int2loc(val & 0xFFF);
                 if (rc.canSenseLocation(loc)) {
                     RobotInfo robot = rc.senseRobotAtLocation(loc);
+                    if (canWrite) {
+                        // we always erase what we can see, since we will also report them
+                        rc.writeSharedArray(ENEMY_ARR_IDX + i, 0);
+                    }
                     if (robot != null && robot.team != oppTeam) {
-                        if (canWrite) {
-                            rc.writeSharedArray(ENEMY_ARR_IDX + i, 0);
-//                            System.out.printf("launcher clear %s", loc);
-                        }
                         continue;
                     }
                 }

@@ -8,6 +8,20 @@ public class Launcher extends Unit {
         return dir.dx * dir.dy != 0;
     }
 
+    static int distanceIgnoringWall(MapLocation start, MapLocation end) throws GameActionException {
+        int dis = Math.max(Math.abs(start.x-end.x), Math.abs(start.y-end.y));
+        MapLocation iter = start.add(start.directionTo(end));
+        while (rc.canSenseLocation(iter) && !iter.equals(end)){
+            if (!rc.sensePassability(iter)) dis--;
+            iter = iter.add(iter.directionTo(end));
+        }
+        return dis;
+    }
+
+    static int walkingDistance(MapLocation start, MapLocation end) {
+        return Math.max(Math.abs(start.x-end.x), Math.abs(start.y-end.y));
+    }
+
     public static final int MAX_HEALTH = 200;
     public static final int DAMAGE = 20;
     public static final int ATTACK_DIS = 16;
@@ -41,11 +55,16 @@ public class Launcher extends Unit {
     static int friendlyLauncherCnt;
 
     static RobotInfo groupingTarget = null;
+    static RobotInfo cachedGroupingTarget = null;
+    static int cachedGroupingRound = -1000;
     static int lastLauncherAttackRound = 0;
     static int ourTeamStrength = 1;
 
     static MapLocation cachedEnemyLocation = null;
     static int cachedRound = 0;
+
+    private static int closeFriendsSize = 0;
+
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
@@ -58,6 +77,7 @@ public class Launcher extends Unit {
         }
         sense();
         micro();
+        indicator += String.format("size%d", closeFriendsSize);
         macro();
         if (rc.isActionReady()){
             sense();
@@ -81,6 +101,10 @@ public class Launcher extends Unit {
             }
         }
         MapRecorder.recordSym(500);
+        if (groupingTarget != null){
+            cachedGroupingTarget = groupingTarget;
+            cachedGroupingRound = rc.getRoundNum();
+        }
     }
 
     static void sense() throws GameActionException {
@@ -92,6 +116,7 @@ public class Launcher extends Unit {
         ourTeamStrength = 1;
         friendlyLauncherCnt = 0;
         enemyLauncherCnt = 0;
+        closeFriendsSize = 0;
         int backupTargetDis = Integer.MAX_VALUE;
         // macro vars
         for (RobotInfo robot : rc.senseNearbyRobots()) {
@@ -100,16 +125,20 @@ public class Launcher extends Unit {
                     if (friendlyLauncherCnt >= MAX_FRIENDLY_CNT) {
                         continue;
                     }
-                    if (robot.getHealth() > rc.getHealth()
-                            && (groupingTarget == null
+                    if (groupingTarget == null
                             || robot.getHealth() > groupingTarget.getHealth()
                             || ((robot.getHealth() == groupingTarget.getHealth())
-                            && (robot.location.distanceSquaredTo(rc.getLocation()) < groupingTarget.location.distanceSquaredTo(rc.getLocation()))))) {
+                            && (robot.location.distanceSquaredTo(rc.getLocation())
+                            < groupingTarget.location.distanceSquaredTo(rc.getLocation())))) {
                         groupingTarget = robot;
                     }
                     friendInCloud[friendlyLauncherCnt] = rc.senseCloud(robot.location);
                     friendlyLaunchers[friendlyLauncherCnt++] = robot;
                     ourTeamStrength += 1;
+                    if (walkingDistance(rc.getLocation(), robot.getLocation()) <= 2 ||
+                            distanceIgnoringWall(rc.getLocation(), robot.getLocation()) <= 2){
+                        closeFriendsSize++;
+                    }
                 } else if (robot.type == RobotType.CARRIER && robot.getNumAnchors(Anchor.STANDARD) != 0) {
                     anchoringCarrier = robot.location;
                 }
@@ -174,6 +203,30 @@ public class Launcher extends Unit {
             tryMoveDir(rc.getLocation().directionTo(closestEnemyHQ).opposite());
             return;
         }
+
+        if (closeFriendsSize < 3 && (rc.getRoundNum() - lastLauncherAttackRound) < 10){
+            if (rc.isMovementReady()
+                    && groupingTarget != null
+                    && !rc.getLocation().isAdjacentTo(groupingTarget.location)) {
+                indicator += "group,";
+                follow(groupingTarget.location);
+            } else if (rc.isMovementReady()
+                    && groupingTarget == null
+                    && cachedGroupingTarget != null
+                    && rc.getRoundNum() - cachedGroupingRound < 6
+                    && !rc.getLocation().isAdjacentTo(cachedGroupingTarget.location)){
+                indicator += String.format("cacheGroup%s,",cachedGroupingTarget.location);
+                follow(cachedGroupingTarget.location);
+            }
+        }
+
+        if (rc.isMovementReady()
+                && !rc.senseCloud(rc.getLocation())
+                && friendlyLauncherCnt == 0
+                && rc.getRoundNum() - lastLauncherAttackRound <= 15){
+            indicator += "stop";
+            return;
+        }
         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
             for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
@@ -195,7 +248,6 @@ public class Launcher extends Unit {
         // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
         boolean needHeal =  (rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < HEALING_CUTOFF;
         if (state == HEALING && !needHeal && (ourTeamStrength >= 3 || rc.getRoundNum() - lastLauncherAttackRound > 50)) {
-            // we stay for 50 turns after healing to defend far away islands
             islandTargetIndex = 0;
             islandTargetLoc = null;
             state = ATTACKING;
@@ -228,7 +280,8 @@ public class Launcher extends Unit {
                 }
             }
             if (state != HEALING && (occupyingTeam == oppTeam ||
-                    (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth))) {
+                    (occupyingTeam == myTeam
+                            && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth))) {
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
                 islandTargetLoc = locs[rc.getID() % locs.length];
                 islandTargetIndex = islandIndex;
@@ -244,7 +297,6 @@ public class Launcher extends Unit {
         return false;
     }
 
-    // returns whether macro can move
     static void micro() throws GameActionException {
 //        indicator += String.format("a%s,b%s,c%s,ca%s,m%b",
 //                attackTarget == null? "" : attackTarget.location,
@@ -300,13 +352,7 @@ public class Launcher extends Unit {
                 chase(cachedEnemyLocation);
             }
         }
-        if (rc.isMovementReady()
-                && rc.getRoundNum() - lastLauncherAttackRound <= 10
-                && groupingTarget != null
-                && !rc.getLocation().isAdjacentTo(groupingTarget.location)) {
-            indicator += "group,";
-            follow(rc.getLocation());
-        }
+
     }
 
     private static void chase(MapLocation location) throws GameActionException{

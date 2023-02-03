@@ -1,4 +1,4 @@
-package bot1;
+package grouping;
 
 import battlecode.common.*;
 import bot1.util.FastMath;

@@ -1,4 +1,4 @@
-package bot1.util;
+package grouping.util;
 
 import battlecode.common.MapLocation;
 

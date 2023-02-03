@@ -34,6 +34,10 @@ public class Headquarter extends Unit {
             Comm.commit_write();
             MapRecorder.hqInit();
         }
+        if (hqid == 0) {
+            Comm.updateExpiredEnemy();
+        }
+        Comm.updateEnemy();
         if (rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ == 0 && hqid == 0) {
             Comm.resetCarrierCnt();
         }
@@ -45,7 +49,6 @@ public class Headquarter extends Unit {
         sense();
 
         if (closestEnemy != null) {
-            Comm.reportEnemy(hqid, closestEnemy.location, rc.getRoundNum());
             // seeing enemy immediately decongests
             isCongested = false;
             lastCongestedRound = -100;

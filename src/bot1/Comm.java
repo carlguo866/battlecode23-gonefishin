@@ -17,13 +17,12 @@ import bot1.util.FastIterableIntSet;
  * well info 96-215 bits
  * 2 types, each 60 bits (5 positionsk)
  *
- * Amplifier 216-345, 5 amps each 26 bits for total of 130 bits
+ * enemy report starting 224
  * 2 bits broadcast roundNumber for alive check
  * 12 bits location,
- * 12 bits for target location
  *
- * Enemy report starting 346-441
- * 4 HQ each have a slot of 24 bits reporting the enemy at that position, and the turn the enemy is seen
+ * amp starting 400, 8 bits total
+ * 2 bits for alive check
  *
  * 35 islands
  * 12 bits for pos, 2 bits for status
@@ -34,8 +33,9 @@ public class Comm extends RobotPlayer {
     private static final int CONGEST_BIT = 64;
     private static final int CARRIER_REPORT_BIT = 80;
     private static final int WELL_INFO_BIT = 96;
-    private static final int AMPLIFIER_BIT = 216;
-    private static final int ENEMY_BIT = 346;
+    private static final int ENEMY_ARR_IDX = 14;
+    private static final int AMPLIFIER_BIT = 400;
+    private static final int ENEMY_BIT = ENEMY_ARR_IDX * 16;
     private static final int ISLAND_BIT = 534;
 
     private static final int CARRIER_REPORT_LEN = 16;
@@ -84,7 +84,7 @@ public class Comm extends RobotPlayer {
             updateSym();
         }
 
-        if (needWellsUpdate) {
+        if (needWellsUpdate && rc.getType() != RobotType.LAUNCHER) {
             updateWells();
         }
     }
@@ -214,41 +214,78 @@ public class Comm extends RobotPlayer {
         writeBits(CARRIER_REPORT_BIT, CARRIER_REPORT_LEN, 0);
     }
 
-    // remnents of amp stuff
-//    public static final int AMPLIFIER_LEN = 26;
-//    public static void amplifierUpdate(int index, MapLocation targetLocation) throws GameActionException {
-//        writeBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index, AMPLIFIER_LEN,
-//                (rc.getRoundNum() % 4 << 24) + (loc2int(rc.getLocation()) << 12) + loc2int(targetLocation));
-//    }
-//    public static MapLocation getTargetLocation(int index) {
-//        return int2loc(readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index + 14, 12));
-//    }
-//    public static MapLocation getAmpLocation(int index) {
-//        return int2loc(readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * index + 2, 12));
-//    }
-//    public static void cleanupAmplifier() {
-//        for (int i = 5; --i >=0;) {
-//            int val = readBits(AMPLIFIER_BIT + AMPLIFIER_LEN * i, AMPLIFIER_LEN);
-//            if(val != 0 && Math.abs((val >> 24) - rc.getRoundNum() % 4) == 2) {
-//                System.out.printf("Amp %d dead?, reset\n", i);
-//                writeBits(AMPLIFIER_BIT + AMPLIFIER_LEN * i, AMPLIFIER_LEN, 0);
-//            }
-//        }
-//    }
+    // enemy report
+    // encoding 2 bit of round + 12 bit of loc
+    private static final int ENEMY_LEN = 10;
 
-    // enemy report starting
-    private static int ENEMY_LEN = 24;
-    public static void reportEnemy(int index, MapLocation location, int roundNumber) {
-        if (getEnemyLoc(index) != null && roundNumber <= getEnemyRound(index)) { // ignore old report
-            return;
+    // called by HQ 0 at start
+    public static void updateExpiredEnemy() throws GameActionException {
+        int curRound = rc.getRoundNum() % 4;
+        int roundToClear = 0;
+        switch (curRound) {
+            case 3: roundToClear = 1; break;
+            case 2: roundToClear = 0; break;
+            case 1: roundToClear = 3; break;
+            case 0: roundToClear = 2; break;
         }
-        writeBits(ENEMY_BIT + index * ENEMY_LEN, ENEMY_LEN, (loc2int(location) << 12) + roundNumber);
+        for (int i = ENEMY_LEN; --i >= 0;) {
+            int val = buffered_share_array[ENEMY_ARR_IDX + i];
+            if (val != 0 && (val >> 12) == roundToClear) {
+                rc.writeSharedArray(ENEMY_ARR_IDX + i, 0);
+//                System.out.printf("clear %s", int2loc(val & 0xFFF));
+            }
+        }
     }
-    public static MapLocation getEnemyLoc(int index) {
-        return int2loc(readBits(ENEMY_BIT + index * ENEMY_LEN, 12));
-    }
-    public static int getEnemyRound(int index) {
-        return readBits(ENEMY_BIT + index * ENEMY_LEN + 12, 12);
+
+    public static MapLocation updateEnemy() throws GameActionException {
+        if (rc.senseNearbyCloudLocations().length == 0) {
+            return null;
+        }
+        MapLocation rv = null;
+        int bestDis = Integer.MAX_VALUE;
+        int writeLoc = 0;
+        boolean canWrite = rc.canWriteSharedArray(0, 0);
+        for (int i = ENEMY_LEN; --i >= 0;) {
+            int val = buffered_share_array[ENEMY_ARR_IDX + i];
+            if (val != 0) {
+                MapLocation loc = int2loc(val & 0xFFF);
+                if (rc.canSenseLocation(loc)) {
+                    RobotInfo robot = rc.senseRobotAtLocation(loc);
+                    if (robot != null && robot.team != oppTeam) {
+                        if (canWrite) {
+                            rc.writeSharedArray(ENEMY_ARR_IDX + i, 0);
+//                            System.out.printf("launcher clear %s", loc);
+                        }
+                        continue;
+                    }
+                }
+                int dis = rc.getLocation().distanceSquaredTo(loc);
+                if (dis < bestDis) {
+                    bestDis = dis;
+                    rv = loc;
+                }
+            } else {
+                writeLoc = i;
+            }
+        }
+        if (canWrite) {
+            int curRound = rc.getRoundNum() % 4;
+            RobotInfo[] enemies = rc.senseNearbyRobots(-1, oppTeam);
+            for (int i = Math.min(5, enemies.length); --i >= 0;) {
+                RobotInfo robot = enemies[i];
+                switch (robot.type) {
+                    case LAUNCHER:
+                    case DESTABILIZER:
+                    case AMPLIFIER:
+                        rc.writeSharedArray(ENEMY_ARR_IDX + writeLoc, loc2int(robot.location) + (curRound << 12));
+                        writeLoc++;
+                        if (writeLoc == ENEMY_LEN) {
+                            writeLoc = 0;
+                        }
+                }
+            }
+        }
+        return bestDis <= 25? rv : null;
     }
 
     // island storage

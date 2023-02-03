@@ -26,6 +26,8 @@ public class Launcher extends Unit {
     private static MapLocation enemyHQLoc = null;
     private static MapLocation homeHQLoc = null;
 
+    private static MapLocation commTarget;
+
     // micro vars
     static RobotInfo attackTarget = null;
     static RobotInfo backupTarget = null;
@@ -62,6 +64,10 @@ public class Launcher extends Unit {
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
         sense();
+        commTarget = Comm.updateEnemy();
+//        if (commTarget != null) {
+//            System.out.println(commTarget);
+//        }
         micro();
         indicator += String.format("size%d", closeFriendsSize);
         macro();
@@ -287,6 +293,14 @@ public class Launcher extends Unit {
 //                chaseTarget == null? "" : chaseTarget.location,
 //                cachedEnemyLocation == null? "" : cachedEnemyLocation,
 //                rc.isMovementReady());
+        if (attackTarget == null && commTarget != null && !rc.canSenseLocation(commTarget)) {
+            if (rc.canAttack(commTarget)) {
+                rc.setIndicatorLine(rc.getLocation(), commTarget, 255, 0, 0);
+                rc.attack(commTarget);
+            }
+            cachedEnemyLocation = commTarget;
+            cachedRound = rc.getRoundNum();
+        }
         RobotInfo target = attackTarget == null? backupTarget : attackTarget;
         if (target != null) {
             if (target == attackTarget) {

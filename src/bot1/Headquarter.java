@@ -118,10 +118,11 @@ public class Headquarter extends Unit {
 
     private static int lastAmpRound = -100;
     private static void tryBuildAmp() throws GameActionException {
-        if (rc.getRoundNum() > 200
+        if (rc.getRoundNum() > 300
                 && hqid % 2 == 0
                 && rc.getRoundNum() - lastAmpRound > 200
                 && !Comm.isAmpAlive(hqid)
+                && rc.getRobotCount() / Comm.numHQ > 25
                 && rc.getRoundNum() - lastEnemyRound > 20) {
             usableAD -= Constants.AMP_COST_AD;
             usableMN -= Constants.AMP_COST_MN;

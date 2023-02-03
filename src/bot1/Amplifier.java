@@ -37,16 +37,20 @@ public class Amplifier extends Unit {
         indicator += String.format("amp%d,strength%d,", ampid, strength);
 
         if (rc.isMovementReady()) {
-            if (closestEnemy == null && centerOfFriend == null) {
-                if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
-                    for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
-                        if (Comm.enemyHQLocations[i % 4] != null) {
-                            enemyHQID = i % 4;
-                            break;
+            if (closestEnemy == null) {
+                if (centerOfFriend == null) {
+                    moveToward(Comm.friendlyHQLocations[ampid]);
+                } else {
+                    if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
+                        for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
+                            if (Comm.enemyHQLocations[i % 4] != null) {
+                                enemyHQID = i % 4;
+                                break;
+                            }
                         }
                     }
+                    moveToward(enemyHQLoc);
                 }
-                moveToward(enemyHQLoc);
             } else {
                 Direction bestMoveDir = null;
                 int bestScore = getScore(currentLoc);

@@ -540,22 +540,14 @@ public class Carrier extends Unit {
             if (rc.getRoundNum() < 150) {
                 miningResourceType = ResourceType.MANA; // mana only on small map for the first 150 turns
             } else {
-                miningResourceType = carrierID % 3 == 2? ResourceType.ADAMANTIUM : ResourceType.MANA;
+                miningResourceType = carrierID % 5 == 4? ResourceType.ADAMANTIUM : ResourceType.MANA;
             }
-        } else if (mapWidth * mapHeight <= 2000) {
-            if (carrierID < Comm.numHQ * 18) {
-                // at max we allow 9 carriers per HQ to mine AD
-                miningResourceType = carrierID % 3 == 2? ResourceType.ADAMANTIUM : ResourceType.MANA;
-            } else {
-                miningResourceType = carrierID % 6 == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
-            }
+        } else if (mapWidth * mapHeight <= 1700) {
+            miningResourceType = carrierID % 5 == 4? ResourceType.ADAMANTIUM : ResourceType.MANA;
+        } else if (mapWidth * mapHeight <= 2600) {
+            miningResourceType = carrierID % 4 == 3? ResourceType.ADAMANTIUM : ResourceType.MANA;
         } else {
-            if (carrierID < Comm.numHQ * 18) {
-                // at max we allow 9 carriers per HQ to mine AD
-                miningResourceType = carrierID % 2 == 1? ResourceType.ADAMANTIUM : ResourceType.MANA;
-            } else {
-                miningResourceType = carrierID % 6 == 0? ResourceType.ADAMANTIUM : ResourceType.MANA;
-            }
+            miningResourceType = carrierID % 3 == 2? ResourceType.ADAMANTIUM : ResourceType.MANA;
         }
         if (rc.getWeight() > 10) {
             // TODO maybe more complicated decision makings

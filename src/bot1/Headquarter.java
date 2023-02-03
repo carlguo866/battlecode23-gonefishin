@@ -57,7 +57,7 @@ public class Headquarter extends Unit {
 
         canBuildLauncher = true;
         canBuildCarrier = true;
-        if (rc.getRoundNum() - lastEnemyRound > 5 && rc.getRobotCount() / Comm.numHQ > 80) {
+        if (rc.getRoundNum() - lastEnemyRound > 5 && rc.getRobotCount() / Comm.numHQ > 100) {
             canBuildLauncher = false;
         }
         if (rc.getRoundNum() > 1900 && rc.getRobotCount() / Comm.numHQ > 30) {
@@ -78,6 +78,10 @@ public class Headquarter extends Unit {
     }
 
     private static void tryBuildAnchor() throws GameActionException {
+        if (rc.getRoundNum() - lastEnemyRound <= 50) {
+            return;
+        }
+
         boolean shouldBuild = false;
         if ((rc.getRobotCount() - carrierCnt) / Comm.numHQ > 18 && carrierCnt / Comm.numHQ > 10)
             shouldBuild = true;
@@ -184,9 +188,9 @@ public class Headquarter extends Unit {
                 || (spawnableTileOccupied > spawnableSet.size / 2 && spawnableTileOccupied > 5)
                 || friendlyCount > 30
                 || spawnableTileOccupied > 12
-                || carrierCnt / Comm.numHQ > 25
                 || rc.getRobotCount() / Comm.numHQ > 80)
                 && rc.getRoundNum() > 100
+                && carrierCnt / Comm.numHQ > 16
                 && rc.getRobotCount() / Comm.numHQ > 30) {
             lastCongestedRound = rc.getRoundNum();
             if (!isCongested) {

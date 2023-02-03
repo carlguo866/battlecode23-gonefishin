@@ -89,6 +89,7 @@ public class Carrier extends Unit {
         }
         if (state == SCOUTING) {
             scoutMove();
+            senseEnemy();
         }
         if (state == SCOUTING) {
             scoutSense();
@@ -407,24 +408,60 @@ public class Carrier extends Unit {
     }
 
     private static void runaway() throws GameActionException {
-        if (state == RUNAWAY) {
-            indicator += "RN,";
-            if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 3) {
-                resumeWork();
-            } else {
-                Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
-                Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
-                        backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
-                boolean hasMoved = true;
-                while (hasMoved && rc.isMovementReady()) {
-                    hasMoved = false;
-                    for (Direction dir : dirs) {
-                        if (rc.canMove(dir)) {
-                            rc.move(dir);
-                            hasMoved = true;
-                            break;
-                        }
+        indicator += "RN,";
+        miningHQLoc = getClosestLoc(Comm.friendlyHQLocations);
+        if (closestEnemy == null && rc.getRoundNum() - lastEnemyRound >= 5) {
+            resumeWork();
+        } else {
+            Direction backDir = rc.getLocation().directionTo(lastEnemyLoc).opposite();
+            Direction[] dirs = {Direction.CENTER, backDir, backDir.rotateLeft(), backDir.rotateRight(),
+                    backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
+            for (int i = 2; --i >= 0 && rc.isMovementReady();) {
+                double bestScore = -1e7;
+                Direction bestDir = null;
+                for (Direction dir : dirs) {
+                    if (!rc.canMove(dir)) {
+                        continue;
                     }
+                    MapLocation loc = rc.getLocation().add(dir);
+                    double score = 0;
+                    if (loc.distanceSquaredTo(lastEnemyLoc) <= 20) {
+                        score -= 1000;
+                    }
+                    if (loc.distanceSquaredTo(lastSenseLocation) <= 16) {
+                        score -= 1000;
+                    }
+                    // if we have AD and can hit enemy after moving, do it
+                    if (rc.getResourceAmount(ResourceType.ADAMANTIUM) >= 16
+                            && closestEnemy != null
+                            && loc.distanceSquaredTo(closestEnemy.location) <= 9) {
+                        score += 3000;
+                    }
+                    // if I have MN and is one tile away from HQ, I can die to deliver it
+                    if (rc.getResourceAmount(ResourceType.MANA) >= 20
+                            && loc.isAdjacentTo(miningHQLoc)) {
+                        score += 3000;
+                    }
+                    score -= Math.sqrt(loc.distanceSquaredTo(miningHQLoc)); // stay close to HQ
+                    score += Math.sqrt(loc.distanceSquaredTo(lastEnemyLoc)); // get away from enemy
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestDir = dir;
+                    }
+                }
+                if (bestDir != null && bestDir != Direction.CENTER) {
+                    rc.move(bestDir);
+                }
+                if (rc.getWeight() > 0 && rc.getLocation().isAdjacentTo(miningHQLoc)) {
+                    int ad = rc.getResourceAmount(ResourceType.ADAMANTIUM);
+                    int mn = rc.getResourceAmount(ResourceType.MANA);
+                    if (rc.canTransferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad)) {
+                        rc.transferResource(miningHQLoc, ResourceType.ADAMANTIUM, ad);
+                    } else if (rc.canTransferResource(miningHQLoc, ResourceType.MANA, mn)) {
+                        rc.transferResource(miningHQLoc, ResourceType.MANA, mn);
+                    }
+                } else if (closestEnemy != null && rc.canAttack(closestEnemy.location)) {
+                    rc.attack(closestEnemy.location);
                 }
             }
         }
@@ -551,6 +588,7 @@ public class Carrier extends Unit {
         }
         if (rc.getWeight() > 10) {
             // TODO maybe more complicated decision makings
+            miningHQLoc = getClosestLoc(Comm.friendlyHQLocations);
             state = DROPPING_RESOURCE;
             return true;
         }

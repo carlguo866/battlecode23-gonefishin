@@ -8,20 +8,6 @@ public class Launcher extends Unit {
         return dir.dx * dir.dy != 0;
     }
 
-    static int distanceIgnoringWall(MapLocation start, MapLocation end) throws GameActionException {
-        int dis = Math.max(Math.abs(start.x-end.x), Math.abs(start.y-end.y));
-        MapLocation iter = start.add(start.directionTo(end));
-        while (rc.canSenseLocation(iter) && !iter.equals(end)){
-            if (!rc.sensePassability(iter)) dis--;
-            iter = iter.add(iter.directionTo(end));
-        }
-        return dis;
-    }
-
-    static int walkingDistance(MapLocation start, MapLocation end) {
-        return Math.max(Math.abs(start.x-end.x), Math.abs(start.y-end.y));
-    }
-
     public static final int MAX_HEALTH = 200;
     public static final int DAMAGE = 20;
     public static final int ATTACK_DIS = 16;
@@ -57,7 +43,7 @@ public class Launcher extends Unit {
     static RobotInfo groupingTarget = null;
     static RobotInfo cachedGroupingTarget = null;
     static int cachedGroupingRound = -1000;
-    static int lastLauncherAttackRound = 0;
+    static int lastLauncherAttackRound = -100;
     static int ourTeamStrength = 1;
 
     static MapLocation cachedEnemyLocation = null;
@@ -127,16 +113,14 @@ public class Launcher extends Unit {
                     }
                     if (groupingTarget == null
                             || robot.getHealth() > groupingTarget.getHealth()
-                            || ((robot.getHealth() == groupingTarget.getHealth())
-                            && (robot.location.distanceSquaredTo(rc.getLocation())
-                            < groupingTarget.location.distanceSquaredTo(rc.getLocation())))) {
+                            || (robot.getHealth() == groupingTarget.getHealth() && robot.location.distanceSquaredTo(enemyHQLoc) < groupingTarget.location.distanceSquaredTo(enemyHQLoc))
+                        ) {
                         groupingTarget = robot;
                     }
                     friendInCloud[friendlyLauncherCnt] = rc.senseCloud(robot.location);
                     friendlyLaunchers[friendlyLauncherCnt++] = robot;
                     ourTeamStrength += 1;
-                    if (walkingDistance(rc.getLocation(), robot.getLocation()) <= 2 ||
-                            distanceIgnoringWall(rc.getLocation(), robot.getLocation()) <= 2){
+                    if (robot.location.distanceSquaredTo(rc.getLocation()) <= 8){
                         closeFriendsSize++;
                     }
                 } else if (robot.type == RobotType.CARRIER && robot.getNumAnchors(Anchor.STANDARD) != 0) {
@@ -204,12 +188,17 @@ public class Launcher extends Unit {
             return;
         }
 
-        if (closeFriendsSize < 3 && (rc.getRoundNum() - lastLauncherAttackRound) < 10){
-            if (rc.isMovementReady()
-                    && groupingTarget != null
-                    && !rc.getLocation().isAdjacentTo(groupingTarget.location)) {
+        if (closeFriendsSize < 3 && (rc.getRoundNum() - lastLauncherAttackRound) < 10) {
+            if (rc.isMovementReady() && groupingTarget != null ) {
                 indicator += "group,";
-                follow(groupingTarget.location);
+                if (!rc.getLocation().isAdjacentTo(groupingTarget.location)) {
+                    follow(groupingTarget.location);
+                } else if (rc.getHealth() < groupingTarget.health) { // allowing healthier target to move away first
+                    indicator += "stop";
+                    rc.setIndicatorDot(rc.getLocation(), 0, 255, 0);
+                    return;
+                }
+                rc.setIndicatorLine(rc.getLocation(), groupingTarget.location, 0, 255, 0);
             } else if (rc.isMovementReady()
                     && groupingTarget == null
                     && cachedGroupingTarget != null
@@ -217,16 +206,10 @@ public class Launcher extends Unit {
                     && !rc.getLocation().isAdjacentTo(cachedGroupingTarget.location)){
                 indicator += String.format("cacheGroup%s,",cachedGroupingTarget.location);
                 follow(cachedGroupingTarget.location);
+                rc.setIndicatorLine(rc.getLocation(), cachedGroupingTarget.location, 0, 255, 0);
             }
         }
 
-        if (rc.isMovementReady()
-                && !rc.senseCloud(rc.getLocation())
-                && friendlyLauncherCnt == 0
-                && rc.getRoundNum() - lastLauncherAttackRound <= 15){
-            indicator += "stop";
-            return;
-        }
         // if I am next to enemy HQ and hasn't seen anything, go to the next HQ
         if (rc.getLocation().distanceSquaredTo(enemyHQLoc) <= 16) {
             for (int i = enemyHQID + 1; i <= enemyHQID + 4; i++) {
@@ -396,7 +379,7 @@ public class Launcher extends Unit {
     }
     private static void kite(MapLocation location) throws GameActionException {
         Direction backDir = rc.getLocation().directionTo(location).opposite();
-        Direction[] dirs = {backDir, backDir.rotateLeft(), backDir.rotateRight(),
+        Direction[] dirs = {Direction.CENTER, backDir, backDir.rotateLeft(), backDir.rotateRight(),
                 backDir.rotateLeft().rotateLeft(), backDir.rotateRight().rotateRight()};
         Direction bestDir = null;
         int minCanSee = Integer.MAX_VALUE;
@@ -425,7 +408,7 @@ public class Launcher extends Unit {
                 }
             }
         }
-        if (bestDir != null){
+        if (bestDir != null && bestDir != Direction.CENTER){
             indicator += "kite,";
             rc.move(bestDir);
         }

@@ -60,6 +60,10 @@ public class Headquarter extends Unit {
         if (rc.getRoundNum() - lastEnemyRound > 5 && rc.getRobotCount() / Comm.numHQ > 80) {
             canBuildLauncher = false;
         }
+        if (rc.getRoundNum() > 1900 && rc.getRobotCount() / Comm.numHQ > 30) {
+            canBuildLauncher = false;
+            // this is mostly a stalemate, accumulate mana for tiebreaker and hope for the best
+        }
         if (rc.getRoundNum() - lastEnemyRound <= 5 || Comm.isCongested()) {
             canBuildCarrier = false;
         }
@@ -87,9 +91,13 @@ public class Headquarter extends Unit {
                 && hqid == 0 && rc.getRobotCount() / Comm.numHQ > 15)
             shouldBuild = true;
 
+        double interval = 6500.0 / (islandCount + 30.0);
+        // 4 island -> 191, 12 islands -> 154, 36 islands -> 98
+        interval *= Math.sqrt(Comm.numHQ); // when more HQ, interval longer
+
         if (shouldBuild
                 && rc.getNumAnchors(Anchor.STANDARD) == 0
-                && rc.getRoundNum() - lastRoundAnchorBuilt > 100) {
+                && rc.getRoundNum() - lastRoundAnchorBuilt > interval) {
             usableAD -= Constants.ANCHOR_COST_AD;
             usableMN -= Constants.ANCHOR_COST_MN;
             if (rc.canBuildAnchor(Anchor.STANDARD)) {

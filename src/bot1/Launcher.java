@@ -158,11 +158,11 @@ public class Launcher extends Unit {
         }
         if (tryIslandStuff())
             return;
-        if (anchoringCarrier != null) { // try escorting anchoring carrier
-            follow(anchoringCarrier);
-            indicator += "escort,";
-            return;
-        }
+//        if (anchoringCarrier != null) { // try escorting anchoring carrier
+//            follow(anchoringCarrier);
+//            indicator += "escort,";
+//            return;
+//        }
         if (lastSym != Comm.symmetry) {
             // recaculate the closest HQ when sym changes
             lastSym = Comm.symmetry;
@@ -194,7 +194,8 @@ public class Launcher extends Unit {
     static boolean tryIslandStuff() throws GameActionException {
         // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
         boolean needHeal =  (rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < HEALING_CUTOFF;
-        if (state == HEALING && !needHeal) {
+        if (state == HEALING && !needHeal && (ourTeamStrength >= 3 || rc.getRoundNum() - lastLauncherAttackRound > 50)) {
+            // we stay for 50 turns after healing to defend far away islands
             islandTargetIndex = 0;
             islandTargetLoc = null;
             state = ATTACKING;
@@ -226,8 +227,8 @@ public class Launcher extends Unit {
                     state = ATTACKING;
                 }
             }
-            if (occupyingTeam == oppTeam ||
-                    (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth)) {
+            if (state != HEALING && (occupyingTeam == oppTeam ||
+                    (occupyingTeam == myTeam && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth))) {
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
                 islandTargetLoc = locs[rc.getID() % locs.length];
                 islandTargetIndex = islandIndex;

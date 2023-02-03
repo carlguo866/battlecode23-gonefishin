@@ -119,21 +119,21 @@ public class Unit extends RobotPlayer {
                 randomMove();
                 pathingCnt = 0;
             }
-            if (stuckCnt >= 10) {
-                // make sure if it's a carrier on a well, wait 40 turns
-                do {
-                    if (rc.getType() == RobotType.CARRIER && rc.getWeight() == GameConstants.CARRIER_CAPACITY) {
-                        if (rc.senseWell(rc.getLocation()) != null || stuckCnt < 20) {
-                            break; // a carrier on a well should never disintegrate, a carrier with max resource gets extra time
-                        }
-                        if (rc.getNumAnchors(Anchor.STANDARD) == 1 && stuckCnt < 40) {
-                            break; // a carrier trying having an anchor gets extra time
-                        }
-                    }
-                    System.out.printf("loc %s disintegrate due to stuck\n", rc.getLocation());
-                    rc.disintegrate();
-                } while (false);
-            }
+//            if (stuckCnt >= 10) {
+//                // make sure if it's a carrier on a well, wait 40 turns
+//                do {
+//                    if (rc.getType() == RobotType.CARRIER && rc.getWeight() == GameConstants.CARRIER_CAPACITY) {
+//                        if (rc.senseWell(rc.getLocation()) != null || stuckCnt < 20) {
+//                            break; // a carrier on a well should never disintegrate, a carrier with max resource gets extra time
+//                        }
+//                        if (rc.getNumAnchors(Anchor.STANDARD) == 1 && stuckCnt < 40) {
+//                            break; // a carrier trying having an anchor gets extra time
+//                        }
+//                    }
+//                    System.out.printf("loc %s disintegrate due to stuck\n", rc.getLocation());
+//                    rc.disintegrate();
+//                } while (false);
+//            }
             if (pathingCnt == 0) {
                 //if free of obstacle: try go directly to target
                 Direction dir = rc.getLocation().directionTo(location);
@@ -154,7 +154,7 @@ public class Unit extends RobotPlayer {
                         currentTurnDir = getTurnDir(dir, location);
                     }
                     while (!canPass(dir) && pathingCnt != 8) {
-                        rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(dir), 0, 0, 255);
+//                        rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(dir), 0, 0, 255);
                         if (!rc.onTheMap(rc.getLocation().add(dir))) {
                             currentTurnDir ^= 1;
                             pathingCnt = 0;
@@ -176,13 +176,13 @@ public class Unit extends RobotPlayer {
             } else {
                 //update stack of past directions, move to next available direction
                 while (pathingCnt > 0 && canPass(prv[pathingCnt - 1])) {
-                    rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(prv[pathingCnt - 1]), 0, 255, 0);
+//                    rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(prv[pathingCnt - 1]), 0, 255, 0);
                     pathingCnt--;
                 }
                 int pathingCntCutOff = Math.min(PRV_LENGTH, pathingCnt + 8); // if 8 then all dirs blocked
                 while (pathingCnt > 0 && !canPass(currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight())) {
                     prv[pathingCnt] = currentTurnDir == 0?prv[pathingCnt - 1].rotateLeft():prv[pathingCnt - 1].rotateRight();
-                    rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(prv[pathingCnt]), 255, 0, 0);
+//                    rc.setIndicatorLine(rc.getLocation(), rc.getLocation().add(prv[pathingCnt]), 255, 0, 0);
                     if (!rc.onTheMap(rc.getLocation().add(prv[pathingCnt]))) {
                         currentTurnDir ^= 1;
                         pathingCnt = 0;
@@ -332,7 +332,7 @@ public class Unit extends RobotPlayer {
         if (!MapRecorder.check(loc, targetDir)) return false;
         if (!rc.canSenseLocation(loc)) return true;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
-        if (robot == null || rc.getNumAnchors(Anchor.STANDARD) == 1)
+        if (robot == null)
             return true;
         return false;
 //        return FastMath.rand256() % 4 == 0; // rng doesn't seem to help
@@ -343,7 +343,7 @@ public class Unit extends RobotPlayer {
         if (!MapRecorder.check(loc, targetDir)) return false;
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         // anchoring carriers don't yield to other robots
-        if (robot == null || rc.getNumAnchors(Anchor.STANDARD) == 1)
+        if (robot == null)
             return true;
         return FastMath.rand256() % 4 == 0; // Does rng help here? Each rng is 10 bytecode btw
     }

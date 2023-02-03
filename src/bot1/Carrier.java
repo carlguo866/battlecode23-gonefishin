@@ -4,6 +4,7 @@ import battlecode.common.*;
 import bot1.util.FastIterableIntSet;
 import bot1.util.FastIterableLocSet;
 import bot1.util.FastLocIntMap;
+import bot1.util.FastMath;
 
 import java.util.Random;
 
@@ -150,6 +151,9 @@ public class Carrier extends Unit {
                 lastEnemyOnMine.remove(miningWellLoc);
                 lastEnemyOnMine.add(miningWellLoc, rc.getRoundNum());
             } else if (state == ANCHORING) { // reset anchoring target
+                if (targetIslandIndex != -1) {
+                    islandIgnoreUntil[targetIslandIndex] = rc.getRoundNum() + 150;
+                }
                 targetLoc = null;
                 targetIslandIndex = 0;
             }
@@ -177,36 +181,93 @@ public class Carrier extends Unit {
 
     private static MapLocation targetLoc;
     private static int targetIslandIndex = -1;
-    private static FastIterableIntSet ignoredIslands = new FastIterableIntSet(GameConstants.MAX_NUMBER_ISLANDS);
+    private static int[] islandIgnoreUntil = new int[islandCount + 1];
+    private static int lastRandomLocRound = -100;
     private static void anchor() throws GameActionException {
         indicator += String.format("anchor %d@%s,", targetIslandIndex, targetLoc);
+
+        if (targetIslandIndex == -1 && targetLoc != null &&
+                (rc.getRoundNum() - lastRandomLocRound > 100 || rc.canSenseLocation(targetLoc))) {
+            targetLoc = null;
+        }
+
+        if (targetLoc != null) {
+            rc.setIndicatorLine(rc.getLocation(), targetLoc, 255, 255, 255);
+        }
+
         int currentIslandIndex = rc.senseIsland(rc.getLocation());
-        if (currentIslandIndex != -1 && rc.senseTeamOccupyingIsland(currentIslandIndex) == Team.NEUTRAL) {
-            if (rc.canPlaceAnchor()) {
-                rc.placeAnchor();
-                // on island so must can report
-                Comm.reportIsland(rc.getLocation(), currentIslandIndex, Comm.ISLAND_FRIENDLY);
-                Comm.commit_write();
-                resumeWork();
+        if (currentIslandIndex != -1
+                && currentIslandIndex == targetIslandIndex
+                && rc.senseTeamOccupyingIsland(currentIslandIndex) == Team.NEUTRAL
+                && rc.canPlaceAnchor()) {
+            rc.placeAnchor();
+            // on island so must can report
+            Comm.reportIsland(rc.getLocation(), currentIslandIndex, Comm.ISLAND_FRIENDLY);
+            Comm.commit_write();
+            resumeWork();
+        }
+
+        // try to find target from Comm and visual
+        if (targetLoc == null || rc.getRoundNum() % 20 == 0) {
+            double bestScore = -1e9;
+            for (int i = 1; i <= islandCount; i++) {
+                MapLocation islandLocation = islandLocations[i];
+                if (islandLocation == null) {
+                    islandLocation = Comm.getIslandLocation(i);
+                }
+                if (islandLocation == null) {
+                    continue;
+                }
+
+                double score = 0;
+                // ignore penalty
+                if (islandIgnoreUntil[i] > rc.getRoundNum()) {
+                    score -= (islandIgnoreUntil[i] - rc.getRoundNum()) * 100;
+                }
+                // prefer neutral island
+                if (Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL) {
+                    score += 1000;
+                }
+                double dis2friend = Math.sqrt(getClosestDis(islandLocation, Comm.friendlyHQLocations));
+                double dis2e = Math.sqrt(getClosestDis(islandLocation, Comm.enemyHQLocations));
+                double dis2me = Math.sqrt(islandLocation.distanceSquaredTo(rc.getLocation()));
+                // prefer islands closer to my side
+                if (dis2e < dis2friend) {
+                    score -= 2000;
+                }
+                // prefer island closer to the center
+                score -= 5 * Math.abs(dis2friend - dis2e); // centerness penalty
+                // prefer island closer to me
+                score -= dis2me;
+                // add some salt of rng
+                score += FastMath.rand256() % 16;
+//                System.out.printf("island loc %s score %.2f\n", islandLocation, score);
+                if (score > bestScore) {
+                    bestScore = score;
+                    targetLoc = islandLocation;
+                    targetIslandIndex = i;
+                }
             }
         }
 
-        // if visually see a target, focus on that first
+        // otherwise if visually see a target, focus on that
         int[] islands = rc.senseNearbyIslands();
         int dis = targetLoc == null? Integer.MAX_VALUE : targetLoc.distanceSquaredTo(rc.getLocation());
         for (int island : islands) {
             if (rc.senseTeamOccupyingIsland(island) == myTeam) {
                 if (island == targetIslandIndex) {
                     // the original target is not placable anymore
-                    ignoredIslands.add(island);
+                    islandIgnoreUntil[island] = rc.getRoundNum() + 300;
                     targetIslandIndex = -1;
                     targetLoc = null;
                 }
                 continue; // we can't place here
             }
-            if (island == targetIslandIndex) {
-                break; // our target is correct, just go there, don't change move target
+            if (island == targetIslandIndex && FastMath.rand256() % 32 != 0) {
+                break; // our target is correct, just go there, change target only with a small chance
             }
+            if (targetIslandIndex != -1)
+                continue;
             MapLocation locs[] = rc.senseNearbyIslandLocations(island);
             for (MapLocation loc : locs) {
                 if (rc.getLocation().distanceSquaredTo(loc) < dis) {
@@ -217,35 +278,18 @@ public class Carrier extends Unit {
             }
         }
 
-        // otherwise try to find target from Comm
-        if (targetLoc == null) {
-            boolean targetNeutral = false;
-            int targetDis = Integer.MAX_VALUE;
-            for (int i = 1; i <= islandCount; i++) {
-                if (ignoredIslands.contains(i)) {
-                    continue;
-                }
-                MapLocation islandLocation = Comm.getIslandLocation(i);
-                if (islandLocation != null) {
-                    boolean neutral = Comm.getIslandStatus(i) == Comm.ISLAND_NEUTRAL;
-                    int islandDis = islandLocation.distanceSquaredTo(rc.getLocation());
-                    if (targetLoc == null
-                            || (!targetNeutral && neutral)
-                            || (targetNeutral == neutral && targetDis > dis)) {
-                        dis = islandDis;
-                        targetNeutral = neutral;
-                        targetLoc = islandLocation;
-                        targetIslandIndex = i;
-                    }
-                }
+
+        // randomly select a target that we haven't seen
+        for (int i = 0; targetLoc == null; i++) {
+            int x = FastMath.rand256() % mapWidth;
+            int y = FastMath.rand256() % mapHeight;
+            if ((MapRecorder.vals[x * mapHeight + y] & MapRecorder.SEEN_BIT) == 0 || i > 15) {
+                targetLoc = new MapLocation(x, y);
+                targetIslandIndex = -1;
+                lastRandomLocRound = rc.getRoundNum();
             }
         }
-
-        if (targetLoc == null) {
-            randomMove();
-        } else {
-            moveToward(targetLoc);
-        }
+        moveToward(targetLoc);
     }
 
     private static MapLocation lastSenseLocation = new MapLocation(-1, -1);

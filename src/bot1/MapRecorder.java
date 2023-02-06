@@ -4,17 +4,16 @@ import battlecode.common.*;
 import bot1.util.FastIterableLocSet;
 
 public class MapRecorder extends RobotPlayer {
-    // TODO: try to use the leftmost 22 bits for path finding, leave me the right most 10 for scouting
-    // perform bit hack to reduce init cost
     public static final char SEEN_BIT = 1 << 4;
     public static final char CLOUD_BIT = 1 << 5;
     public static final char WELL_BIT = 1 << 6;
     public static final char PASSIABLE_BIT = 1 << 7;
     public static final char CURRENT_MASK = 0xF;
-    // current use & 0xF for ordinal
 
+    // fun fact: this costs 1 bytecode, but declaring array costs 3600
     public static char[] vals = Constants.MAP_LEN_STRING.toCharArray();
 
+    // this function is used by pathing, no idea why it's in this file
     public static boolean check(MapLocation loc, Direction targetDir) throws GameActionException {
         if (!rc.onTheMap(loc))
             return false;
@@ -32,6 +31,8 @@ public class MapRecorder extends RobotPlayer {
         }
     }
 
+    // record what we can sense on the map, perform sym check if needed
+    // always called at the end of a turn and will run until all bytecode consumed
     public static void recordSym(int leaveBytecodeCnt) throws GameActionException {
         MapInfo[] infos = rc.senseNearbyMapInfos();
         for (int i = infos.length; --i >= 0; ) {
@@ -86,6 +87,7 @@ public class MapRecorder extends RobotPlayer {
         }
     }
 
+    // get a set of all minable squares around a mine
     public static FastIterableLocSet getMinableSquares(MapLocation mineLoc, ResourceType resourceType) {
         FastIterableLocSet set = new FastIterableLocSet(10);
         for (int i = 9; --i>=0;) {
@@ -127,7 +129,8 @@ public class MapRecorder extends RobotPlayer {
 
     private static final int HQ_SPAWNABLE_DX[] = {-3, 0, 0, 3, -2, -2, 2, 2, -2, -2, -1, -1, 1, 1, 2, 2, -2, 0, 0, 2, -1, -1, 1, 1, -1, 0, 0, 1};
     private static final int HQ_SPAWNABLE_DY[] = {0, -3, 3, 0, -2, 2, -2, 2, -1, 1, -2, 2, -2, 2, -1, 1, 0, -2, 2, 0, -1, 1, -1, 1, 0, -1, 1, 0};
-    // this func called at the start of each HQ to get us out of jail
+    // this func called at the start of each HQ to get us out of jail,
+    // and avoid spawning on tiles with current (that messes up formation)
     public static void hqInit() throws GameActionException {
         // use scripts/pos_gen.py
         MapInfo[] infos = rc.senseNearbyMapInfos();

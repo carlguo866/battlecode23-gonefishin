@@ -80,7 +80,7 @@ public class Unit extends RobotPlayer {
         return getClosestLoc(rc.getLocation(), locations);
     }
 
-    // new path finding code from Ray
+    // new path finding code from Ray that implements a somewhat modified bugnav
     private static final int PRV_LENGTH = 60;
     private static Direction[] prv = new Direction[PRV_LENGTH];
     private static int pathingCnt = 0;
@@ -239,6 +239,7 @@ public class Unit extends RobotPlayer {
     }
 
     private static final int BYTECODE_CUTOFF = 3000;
+    // this simulates turning left and right to find the best direction
     static int getTurnDir(Direction direction, MapLocation target) throws GameActionException{
         //int ret = getCenterDir(direction);
         MapLocation now = rc.getLocation();

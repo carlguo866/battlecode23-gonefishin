@@ -13,11 +13,12 @@ import bot1.util.FastIterableIntSet;
  * 48-50: 3 bit whether symmetries of the map have been eliminated:
  * [ROTATIONAL, VERTIAL, HORIZONTAL]
  * 64-67: 4 bits indicating whether the 4 HQs are congested
+ * 80-95: 16 bits indicating the number of carriers present
  *
  * well info 96-215 bits
  * 2 types, each 60 bits (5 positionsk)
  *
- * enemy report starting 224
+ * enemy report starting 224 for 10 enemies
  * 2 bits broadcast roundNumber for alive check
  * 12 bits location,
  *
@@ -35,7 +36,6 @@ public class Comm extends RobotPlayer {
     private static final int WELL_INFO_BIT = 96;
     private static final int ENEMY_ARR_IDX = 14;
     private static final int AMPLIFIER_BIT = 400;
-    private static final int ENEMY_BIT = ENEMY_ARR_IDX * 16;
     private static final int ISLAND_BIT = 534;
 
     private static final int CARRIER_REPORT_LEN = 16;
@@ -43,7 +43,6 @@ public class Comm extends RobotPlayer {
     public static final int ISLAND_NEUTRAL = 0;
     public static final int ISLAND_FRIENDLY = 1;
     public static final int ISLAND_ENEMY = 2;
-    public static final int ISLAND_ON_THE_WAY = 3; // carrier is on the way
 
     private static int[] buffered_share_array = new int[ARRAY_LENGTH];
     private static FastIterableIntSet changedIndexes = new FastIterableIntSet(ARRAY_LENGTH);
@@ -307,24 +306,11 @@ public class Comm extends RobotPlayer {
     }
 
     // island storage
-    public static int getIslandIndex(MapLocation t) {
-        for (int i = 0; i < 35; i++) {
-            int val = readBits(ISLAND_BIT + i * 14, 14);
-            if (val == 0) continue;
-            MapLocation loc = int2loc((val - val % 4) / 4);
-            if (loc.x == t.x && loc.y == t.y) {
-                return (i+1);
-            }
-        }
-        System.out.println("ISLAND NOT FOUND IN COMM");
-        return 36;
-    }
-
-    // returns the index, or 0 if not found
     private static int islandCache = 0;
     private static int islandCacheRound = 100;
     public static int getClosestFriendlyIslandIndex() {
-        // with 35 islands this takes 3500 bytecode... implement caching
+        // This method is really inefficient and takes 100 per island
+        // therefore we cache the result and only recalculate every 20 turns
         if (rc.getRoundNum() - islandCacheRound < 20) {
             return islandCache;
         }

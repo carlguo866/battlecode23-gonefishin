@@ -35,26 +35,20 @@ public class Headquarter extends Unit {
             MapRecorder.hqInit();
         }
         if (hqid == 0) {
+            // HQ 0 is in charge of cleaning up shared array
             Comm.updateExpiredEnemy();
             Comm.cleanupAmplifier();
+            if (rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ == 0) {
+                Comm.resetCarrierCnt();
+            }
         }
         Comm.updateEnemy();
-        if (rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ == 0 && hqid == 0) {
-            Comm.resetCarrierCnt();
-        }
 
         usableMN = rc.getResourceAmount(ResourceType.MANA);
         usableAD = rc.getResourceAmount(ResourceType.ADAMANTIUM);
         usableEL = rc.getResourceAmount(ResourceType.ELIXIR);
 
         sense();
-
-        if (closestEnemy != null) {
-            // seeing enemy immediately decongests
-            isCongested = false;
-            lastCongestedRound = -100;
-            lastEnemyRound = rc.getRoundNum();
-        }
         Comm.reportCongest(hqid, isCongested);
         indicator += String.format("#carrier %d sym %b local congest %b global congest %b",
                 Comm.getCarrierCnt(), Comm.isSymmetryConfirmed, isCongested, Comm.isCongested());
@@ -147,6 +141,7 @@ public class Headquarter extends Unit {
             } else {
                 spawnLoc = getClosestLoc(Comm.enemyHQLocations);
             }
+            // for turn 0, spawn launchers close to each other, with earlier launchers being on the outside
             for (int i = 0; i < maxLauncherSpawn && rc.isActionReady(); i++) {
                 MapLocation loc;
                 if (i == 0) {
@@ -224,6 +219,12 @@ public class Headquarter extends Unit {
                 && rc.getRoundNum() % Comm.CARRIER_REPORT_FREQ > 60) {
             System.out.println("not congested anymore somehow??");
             isCongested = false;
+        }
+        if (closestEnemy != null) {
+            // seeing enemy immediately decongests
+            isCongested = false;
+            lastCongestedRound = -100;
+            lastEnemyRound = rc.getRoundNum();
         }
     }
 

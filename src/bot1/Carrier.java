@@ -1,34 +1,27 @@
 package bot1;
 
 import battlecode.common.*;
-import bot1.util.FastIterableIntSet;
 import bot1.util.FastIterableLocSet;
 import bot1.util.FastLocIntMap;
 import bot1.util.FastMath;
 
-import java.util.Random;
 
 public class Carrier extends Unit {
-    // purposes
-    public static final int MINE_MN = 1; // mining is default
-    public static final int MINE_AD = 2;
-
+    // state constants
     public static final int MINING = 10;
     public static final int DROPPING_RESOURCE = 11;
-
     public static final int REPORT_AND_RUNAWAY = 20;
     public static final int RUNAWAY = 21;
-
     public static final int SCOUTING = 30;
     public static final int REPORTING_INFO = 31;
-
     public static final int ANCHORING = 40;
 
+    public static int state = 0;
+
+    // carriers try to report every 100 turns and get their ID
     public static int lastCarrierReportRound = -1000;
     public static int carrierID = 0;
 
-    public static int purpose = 0;
-    public static int state = 0;
     public static ResourceType miningResourceType;
     public static MapLocation miningWellLoc;
     public static MapLocation miningHQLoc;
@@ -39,7 +32,6 @@ public class Carrier extends Unit {
 
     public static FastIterableLocSet congestedMines = new FastIterableLocSet(290);
     public static FastLocIntMap lastEnemyOnMine = new FastLocIntMap();
-    private static Random rng;
 
     // scouting vars
     static int startHQID;
@@ -70,8 +62,6 @@ public class Carrier extends Unit {
             startHQLoc = Comm.friendlyHQLocations[startHQID];
             scoutCenter = startHQLoc;
 
-            rng = new Random(rc.getID());
-            purpose = rc.getID() % 4 == 0? MINE_AD : MINE_MN;
             updateWells();
             resumeWork();
         }
@@ -317,7 +307,7 @@ public class Carrier extends Unit {
     private static boolean setScoutTarget() {
         boolean success = false;
         for (; Math.abs(scoutAngle) <= Math.PI * 18; scoutAngle += Math.PI / 6 * (rc.getID() % 2 == 0? 1 : -1)) {
-            // scouting along the line r=theta
+            // scouting along the line r=theta according to scoutCenter (the home HQ)
             scoutTarget = scoutCenter.translate(
                     (int)(Math.cos(scoutAngle) * scoutAngle),
                     (int)(Math.sin(scoutAngle) * scoutAngle));
@@ -565,8 +555,8 @@ public class Carrier extends Unit {
         }
     }
 
-    // this func transitions into either mining or scouting or anchoring
-    // and returns true if there's no need to scout anymore
+    // this func tries to resume mining / anchoring
+    // and returns false if I can't do either (so we need to scout for more wells)
     private static boolean resumeWork() {
         if (rc.getNumAnchors(Anchor.STANDARD) != 0) {
             state = ANCHORING;
@@ -650,6 +640,7 @@ public class Carrier extends Unit {
         }
     }
 
+    // this func is called by Comm once it detects that new wells are reported
     public static void updateWells() {
         for (int resource = 1; resource <= 2; resource++) {
             for (int i = 0; i < Comm.NUM_WELLS; i++) {

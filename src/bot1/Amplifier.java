@@ -2,6 +2,8 @@ package bot1;
 
 import battlecode.common.*;
 
+// amps are mostly useless in our strategy
+// they allow friendly launchers to report enemy launchers and they update island status
 public class Amplifier extends Unit {
     public static int ampid = 4;
 

@@ -21,7 +21,6 @@ public class Launcher extends Unit {
     // macro vars
     static int lastSym;
     private static int state = ATTACKING;
-    private static MapLocation anchoringCarrier = null;
     private static int enemyHQID = 0;
     private static MapLocation enemyHQLoc = null;
     private static MapLocation homeHQLoc = null;
@@ -56,7 +55,6 @@ public class Launcher extends Unit {
 
     static void run () throws GameActionException {
         if (turnCount == 0) {
-            // future: get from spawn queue if there are more than one roles
             // prioritize the closest enemy HQ
             lastSym = Comm.symmetry;
             homeHQLoc = getClosestLoc(Comm.friendlyHQLocations);
@@ -64,19 +62,20 @@ public class Launcher extends Unit {
             enemyHQLoc = Comm.enemyHQLocations[enemyHQID];
         }
         sense();
-        commTarget = Comm.updateEnemy();
-//        if (commTarget != null) {
-//            System.out.println(commTarget);
-//        }
+        commTarget = Comm.updateEnemy(); // enemy reported in Comm (useful only when around clouds)
         micro();
-        indicator += String.format("size%d", closeFriendsSize);
         macro();
-        if (rc.isActionReady()){
+        if (rc.isActionReady()) {
             sense();
             micro();
         }
         if (rc.isActionReady()) {
+            // when around clouds, guess attack an attackable but not sensible tile
             tryGuessAttack();
+        }
+        if (groupingTarget != null){
+            cachedGroupingTarget = groupingTarget;
+            cachedGroupingRound = rc.getRoundNum();
         }
         // have launchers perform sym check
         if (Comm.needSymmetryReport && rc.canWriteSharedArray(0, 0)) {
@@ -93,14 +92,9 @@ public class Launcher extends Unit {
             }
         }
         MapRecorder.recordSym(500);
-        if (groupingTarget != null){
-            cachedGroupingTarget = groupingTarget;
-            cachedGroupingRound = rc.getRoundNum();
-        }
     }
 
     static void sense() throws GameActionException {
-        anchoringCarrier = null;
         attackTarget = null;
         chaseTarget = null;
         groupingTarget = null;
@@ -129,8 +123,6 @@ public class Launcher extends Unit {
                     if (robot.location.distanceSquaredTo(rc.getLocation()) <= 8){
                         closeFriendsSize++;
                     }
-                } else if (robot.type == RobotType.CARRIER && robot.getNumAnchors(Anchor.STANDARD) != 0) {
-                    anchoringCarrier = robot.location;
                 }
             } else {
                 if (robot.type == RobotType.HEADQUARTERS) {
@@ -139,7 +131,6 @@ public class Launcher extends Unit {
                         Comm.eliminateSym(Comm.symmetry);
                     }
                     MapRecorder.reportEnemyHQ(robot.location); // this is fairly optimized and unexpensive
-                    continue;
                 } else if (robot.type == RobotType.LAUNCHER || robot.type == RobotType.DESTABILIZER) {
                     if (enemyLauncherCnt >= MAX_ENEMY_CNT) {
                         continue;
@@ -150,7 +141,7 @@ public class Launcher extends Unit {
                     if (robot.location.distanceSquaredTo(rc.getLocation()) > ATTACK_DIS) {
                         chaseTarget = robot;
                     }
-                } else {
+                } else { // carriers / amps / boosters
                     int dis = rc.getLocation().distanceSquaredTo(robot.location);
                     if (dis <= ATTACK_DIS && (backupTarget == null || dis < backupTargetDis)) {
                         backupTarget = robot;
@@ -166,22 +157,16 @@ public class Launcher extends Unit {
     }
 
     static void macro() throws GameActionException {
-        // Cow: only macro move in even turns
-        // try return immediately after a move command, so if we stuck we won't overrun turns
         if (!rc.isMovementReady())
             return;
         if (Comm.needSymmetryReport && rc.getRoundNum() > 150 && rc.getID() % 8 == 0) {
+            // if it's mid/late game and we are the only one that know symmetry, go back to report it
             moveToward(getClosestLoc(Comm.friendlyHQLocations));
             indicator += "gotsym";
             return;
         }
         if (tryIslandStuff())
             return;
-//        if (anchoringCarrier != null) { // try escorting anchoring carrier
-//            follow(anchoringCarrier);
-//            indicator += "escort,";
-//            return;
-//        }
         if (lastSym != Comm.symmetry) {
             // recaculate the closest HQ when sym changes
             lastSym = Comm.symmetry;
@@ -193,7 +178,7 @@ public class Launcher extends Unit {
             tryMoveDir(rc.getLocation().directionTo(closestEnemyHQ).opposite());
             return;
         }
-
+        // slight grouping attempt
         if (closeFriendsSize < 3 && (rc.getRoundNum() - lastLauncherAttackRound) < 10) {
             if (rc.isMovementReady() && groupingTarget != null ) {
                 indicator += "group,";
@@ -230,11 +215,10 @@ public class Launcher extends Unit {
     }
 
     private static int lastFailedHealingTurn = -1000;
-    // returns whether has moved
     private static MapLocation islandTargetLoc = null;
     private static int islandTargetIndex = 0;
     static boolean tryIslandStuff() throws GameActionException {
-        // attempt to go heal if less than 100 health, capture enemy island, protect friendly island
+        // attempt to go heal if <= 120 health, capture enemy island, protect friendly island
         boolean needHeal =  (rc.getHealth() < MAX_HEALTH && state == HEALING) || rc.getHealth() < HEALING_CUTOFF;
         if (state == HEALING && !needHeal && (ourTeamStrength >= 3 || rc.getRoundNum() - lastLauncherAttackRound > 50)) {
             islandTargetIndex = 0;
@@ -271,6 +255,7 @@ public class Launcher extends Unit {
             if (state != HEALING && (occupyingTeam == oppTeam ||
                     (occupyingTeam == myTeam
                             && rc.senseAnchor(islandIndex).totalHealth < Anchor.STANDARD.totalHealth))) {
+                // go stand on contested islands
                 MapLocation locs[] = rc.senseNearbyIslandLocations(islandIndex);
                 islandTargetLoc = locs[rc.getID() % locs.length];
                 islandTargetIndex = islandIndex;
@@ -293,6 +278,7 @@ public class Launcher extends Unit {
 //                chaseTarget == null? "" : chaseTarget.location,
 //                cachedEnemyLocation == null? "" : cachedEnemyLocation,
 //                rc.isMovementReady());
+        // If we can't sense any enemy launcher but there's one reported in Comm, attack it
         if (attackTarget == null && commTarget != null && !rc.canSenseLocation(commTarget)) {
             if (rc.canAttack(commTarget)) {
                 rc.setIndicatorLine(rc.getLocation(), commTarget, 255, 0, 0);
@@ -301,6 +287,7 @@ public class Launcher extends Unit {
             cachedEnemyLocation = commTarget;
             cachedRound = rc.getRoundNum();
         }
+        // otherwise we attack the sensed target in our attack range
         RobotInfo target = attackTarget == null? backupTarget : attackTarget;
         if (target != null) {
             if (target == attackTarget) {
@@ -337,6 +324,7 @@ public class Launcher extends Unit {
             // go back to heal if possible, no chasing
             return;
         }
+        // If we have either sensed or cached an enemy launcher that we can move once and attack, do it
         if (rc.isMovementReady() && rc.isActionReady()) {
             if (chaseTarget != null) {
                 cachedEnemyLocation = chaseTarget.location;
@@ -440,6 +428,7 @@ public class Launcher extends Unit {
             for (int i = 9; --i >= 0;) {
                 MapLocation loc = null;
                 switch (i) {
+                    // it's more likely that the enemy moves toward or away from us, than enemy moving left/right of us
                     case 8: loc = cachedEnemyLocation; break;
                     case 7: loc = cachedEnemyLocation.add(targetDir); break;
                     case 6: loc = cachedEnemyLocation.add(targetDir.opposite()); break;
@@ -514,6 +503,7 @@ public class Launcher extends Unit {
     }
 
     private static RobotInfo getImmediatelyAttackableTarget() {
+        // we try to attack the enemy launcher that could be killed by friendly launchers in the shortest time
         int minHitReqired = Integer.MAX_VALUE;
         RobotInfo rv = null;
         int minDis = Integer.MAX_VALUE;
@@ -526,6 +516,7 @@ public class Launcher extends Unit {
             if (enemy.getHealth() <= DAMAGE) {
                 return enemy;
             }
+            // calculate how many friends can attack this enemy
             int canAttackFriendCnt = 1;
             for (int friend_i = friendlyLauncherCnt; --friend_i >= 0;) {
                 int friendEnemyDis = friendlyLaunchers[friend_i].location.distanceSquaredTo(enemy.location);
